@@ -1,0 +1,27 @@
+{
+  "name": "vite-express-react-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev:client": "vite",
+    "dev:server": "nodemon --watch server server/server.js",
+    "dev": "npm run dev:server",
+    "build": "vite build",
+    "start": "node server/server.js --production"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite-express": "^0.22.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4",
+    "vite": "^5.3.1"
+  }
+}
