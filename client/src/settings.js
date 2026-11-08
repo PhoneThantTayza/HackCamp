@@ -15,6 +15,11 @@ export async function applyToTarget() {
   if (!value || !/^\d+$/.test(value)) return "Settings saved. Click the extension icon on a webpage to apply there, or enable automatic site access.";
   try {
     await chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["content.js"] });
+    // Reduce motion add-on; failures here must not affect the content.js result above.
+    await Promise.allSettled([
+      chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["motion-main.js"], world: "MAIN" }),
+      chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["motion.js"] })
+    ]);
     return "Settings saved and sent to the original tab. Already connected tabs also receive updates.";
   } catch {
     throw new Error("Settings saved, but that tab could not be adjusted. It may be closed, restricted, or need permission. Click the extension icon on a regular webpage and try again.");
