@@ -95,7 +95,7 @@
   globalThis.clearspaceApply.version = 9;
   globalThis.clearspaceStorageListener = (changes, area) => {
     if (area === "local" && changes.settings) globalThis.clearspaceApply(changes.settings.newValue);
-  });
+  };
   chrome.storage.onChanged.addListener(globalThis.clearspaceStorageListener);
   return applySavedSettings();
 })();
