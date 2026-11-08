@@ -314,8 +314,10 @@ test("Save connects open websites with automatic access and requires a page ackn
   };
   const { applyToTarget } = await import("../client/src/settings.js?extension-test");
   assert.match(await applyToTarget(), /applied to 1 website tab/);
-  assert.deepEqual(injected.filter(item => item.files).map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(injected[0].files, ["color-vision.js", "low-vision.js", "content.js"]);
+  // Only content.js injections; motion, click-target, spacing and focus add-ons are injected separately.
+  const pageInjections = injected.filter(item => item.files?.includes("content.js"));
+  assert.deepEqual(pageInjections.map(item => item.target.tabId), [7, 8]);
+  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "content.js"]);
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
   automatic = false;
