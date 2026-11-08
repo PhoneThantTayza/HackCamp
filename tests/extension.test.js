@@ -3,6 +3,32 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
+test("automatic access loads light sensitivity alongside the motor and motion scripts", async () => {
+  const registrations = [];
+  const injections = [];
+  const noop = { addListener() {} };
+  const context = vm.createContext({ chrome: {
+    action: { onClicked: noop }, runtime: { onInstalled: noop, onStartup: noop },
+    permissions: { contains: async () => true, onAdded: noop, onRemoved: noop },
+    tabs: { query: async () => [{ id: 7 }] },
+    scripting: {
+      getRegisteredContentScripts: async () => [],
+      registerContentScripts: async scripts => registrations.push(...scripts),
+      executeScript: async options => injections.push(options),
+    },
+  } });
+  vm.runInContext(readFileSync("client/public/background.js", "utf8"), context);
+  await vm.runInContext("syncAutomaticAccess()", context);
+  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"];
+  assert.deepEqual(Array.from(registrations.find(script => script.id === "clearspace-auto").js), core);
+  assert.deepEqual(Array.from(injections.find(script => script.files.includes("content.js")).files), core);
+  for (const file of ["motion-main.js", "motion.js", "click-targets.js", "button-spacing.js", "keyboard-focus.js"]) {
+    assert.ok(registrations.some(script => script.js.includes(file) && script.allFrames));
+    assert.ok(injections.some(script => script.files.includes(file) && script.target.allFrames));
+  }
+  assert.equal(registrations.find(script => script.js.includes("motion-main.js")).world, "MAIN");
+});
+
 test("adaptive contrast is gradual, preserves readable colours and respects light/dark backgrounds", () => {
   const context = vm.createContext({});
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
@@ -329,8 +355,10 @@ test("Save connects open websites with automatic access and requires a page ackn
   };
   const { applyToTarget } = await import("../client/src/settings.js?extension-test");
   assert.match(await applyToTarget(), /applied to 1 website tab/);
-  assert.deepEqual(injected.filter(item => item.files).map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(injected[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]);
+  // Only content.js injections; motion, click-target, spacing and focus add-ons are injected separately.
+  const pageInjections = injected.filter(item => item.files?.includes("content.js"));
+  assert.deepEqual(pageInjections.map(item => item.target.tabId), [7, 8]);
+  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]);
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
   automatic = false;
