@@ -3,6 +3,34 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
+test("adaptive contrast is gradual, preserves readable colours and respects light/dark backgrounds", () => {
+  const context = vm.createContext({});
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  const { improveText, parseColor, contrast, rules } = context.clearspaceLowVision;
+  const white = [255, 255, 255], dark = [25, 35, 44];
+  const muted = [150, 150, 150, 1];
+  assert.equal(improveText(muted, [white], 0), null);
+  const low = parseColor(improveText(muted, [white], 5));
+  const normal = parseColor(improveText(muted, [white], 100));
+  const high = parseColor(improveText(muted, [white], 200));
+  assert.ok(low[0] < muted[0] && low[0] > normal[0]);
+  assert.ok(contrast(low, white) > contrast(muted, white));
+  assert.ok(contrast(normal, white) >= 4.45);
+  assert.ok(contrast(high, white) >= 6.95);
+  assert.ok(high[0] < normal[0]);
+  const onDark = parseColor(improveText([70, 70, 70, 1], [dark], 100));
+  assert.ok(onDark[0] > 70);
+  assert.ok(contrast(onDark, dark) >= 4.45);
+  for (const strength of [5, 50, 100, 200]) {
+    assert.equal(improveText([255, 255, 255, 1], [[183, 28, 28], [198, 40, 40]], strength), null, 'white-on-red heading must stay white');
+    assert.equal(rules('Higher contrast', strength), '', 'no blanket background or foreground overrides');
+  }
+  assert.equal(improveText([17, 17, 17, 1], [white], 100), null);
+  assert.equal(improveText(muted, null, 100), null, 'unknown surfaces must not be guessed');
+  // A gradient spanning black and white has no universally readable text colour.
+  assert.equal(improveText([0, 0, 0, 1], [[0, 0, 0], white], 100), null);
+});
+
 test("page styles update without duplication and disable removes only our sheet", async () => {
   const websiteSheet = { website: true };
   const document = { adoptedStyleSheets: [websiteSheet] };
@@ -13,6 +41,7 @@ test("page styles update without duplication and disable removes only our sheet"
   } });
   const source = readFileSync("client/public/content.js", "utf8");
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   assert.equal(document.adoptedStyleSheets.length, 2);
@@ -41,11 +70,98 @@ test("page styles update without duplication and disable removes only our sheet"
 
 test("build contains the files referenced by the manifest", () => {
   const manifest = JSON.parse(readFileSync("dist/manifest.json", "utf8"));
-  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "content.js"]) {
+  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "content.js"]) {
     assert.ok(readFileSync(`dist/${file}`).length);
   }
   assert.equal(manifest.manifest_version, 3);
   assert.ok(!manifest.host_permissions, "broad site access must remain optional");
+});
+
+test("low vision choices persist while obsolete vision choices are ignored", async t => {
+  const previousStorage = globalThis.localStorage;
+  t.after(() => {
+    if (previousStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previousStorage;
+  });
+  let stored;
+  globalThis.localStorage = { getItem: () => stored ?? null, setItem: (_, value) => { stored = value; } };
+  const { loadSettings, saveSettings, defaults, lowVisionOptions } = await import("../client/src/settings.js?low-vision-test");
+  assert.deepEqual((await loadSettings()).selected, []);
+  const selected = lowVisionOptions.map(option => `vision:${option}`);
+  const lowVision = Object.fromEntries(lowVisionOptions.map((option, index) => [option, 125 + index * 25]));
+  await saveSettings({ ...defaults, selected, lowVision });
+  assert.deepEqual((await loadSettings()).lowVision, lowVision);
+  await saveSettings({ ...defaults, selected: [...selected, "vision:Larger text", "vision:High contrast", "motor:Reduce motion"] });
+  assert.deepEqual((await loadSettings()).selected, [...selected, "motor:Reduce motion"]);
+  await saveSettings(defaults);
+  assert.deepEqual((await loadSettings()).selected, []);
+  assert.deepEqual((await loadSettings()).lowVision, defaults.lowVision);
+});
+
+test("low vision updates independently, restores website styles and combines with colour assistance", async () => {
+  const websiteSheet = { website: true };
+  const document = { adoptedStyleSheets: [websiteSheet] };
+  const settings = { version: 1, enabled: true, selected: [
+    "vision:More visible keyboard focus", "vision:More visible links", "vision:Higher contrast", "vision:Larger text and controls",
+    "motor:Keyboard focus indicators",
+  ], colorVision: { mode: "off", cues: true } };
+  const listeners = [];
+  const context = vm.createContext({ document, CSSStyleSheet: class { replaceSync(css) { this.css = css; } }, chrome: {
+    storage: { local: { get: async () => ({ settings }) }, onChanged: { addListener: fn => listeners.push(fn) } }
+  } });
+  vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  const source = readFileSync("client/public/content.js", "utf8");
+  await vm.runInContext(source, context);
+  const css = document.adoptedStyleSheets[1].css;
+  assert.match(css, /zoom: 1.25/);
+  assert.match(css, /min-height: 44px/);
+  assert.match(css, /background-color: #fff/);
+  assert.match(css, /text-decoration-thickness: 0\.15em/);
+  assert.match(css, /outline: 4px solid #000/);
+  assert.ok(css.lastIndexOf("outline: 4px") > css.lastIndexOf("outline: 3px"));
+  assert.doesNotMatch(css, /color-scheme:|background-image: none/);
+  await vm.runInContext(source, context);
+  assert.equal(listeners.length, 1);
+  assert.equal(document.adoptedStyleSheets.length, 2);
+  const apply = value => listeners[0]({ settings: { newValue: value } }, "local");
+  apply({ ...settings, selected: ["vision:More visible links"], colorVision: { mode: "off" } });
+  assert.match(document.adoptedStyleSheets[1].css, /text-decoration-thickness/);
+  assert.doesNotMatch(document.adoptedStyleSheets[1].css, /zoom:|outline:|color-scheme:/);
+  apply({ ...settings, enabled: false });
+  assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
+  apply(settings);
+  assert.match(document.adoptedStyleSheets[1].css, /zoom: 1.25/);
+  apply({ ...settings, colorVision: { mode: "off" }, lowVision: {
+    "Larger text and controls": 40, "Higher contrast": 50,
+    "More visible links": 60, "More visible keyboard focus": 20,
+  } });
+  const partial = document.adoptedStyleSheets[1].css;
+  assert.match(partial, /zoom: 1.1/);
+  assert.match(partial, /min-height: 32px/);
+  assert.doesNotMatch(partial, /color-scheme:|background-image: none/);
+  assert.match(partial, /font-weight: 580/);
+  assert.match(partial, /outline: 1.6px solid #000/);
+  apply({ ...settings, colorVision: { mode: "off" }, lowVision: {
+    "Larger text and controls": 200, "Higher contrast": 200,
+    "More visible links": 200, "More visible keyboard focus": 200,
+  } });
+  const maximum = document.adoptedStyleSheets[1].css;
+  assert.match(maximum, /zoom: 1.5/);
+  assert.match(maximum, /min-height: 64px/);
+  assert.doesNotMatch(maximum, /color-scheme:|background-image: none/);
+  assert.match(maximum, /background-color: #fff/);
+
+  assert.match(maximum, /font-weight: 1000/);
+  assert.match(maximum, /text-decoration-thickness: 0\.25em/);
+  assert.match(maximum, /outline: 7px solid #000/);
+  assert.match(maximum, /box-shadow: 0 0 0 14px #fff/);
+  for (const option of ["Larger text and controls", "Higher contrast", "More visible links", "More visible keyboard focus"]) {
+    apply({ ...settings, selected: [`vision:${option}`], colorVision: { mode: "off" }, lowVision: { [option]: 0 } });
+    assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
+  }
+  apply({ version: 1, enabled: true, selected: [] });
+  assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
 });
 
 test("colour assistance updates and removes its own SVG and styles across save, pause and reset", async () => {
@@ -63,13 +179,14 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   const websiteSheet = { website: true };
   const document = { URL: "https://example.test/article#section", documentElement: root, createElementNS: (_, name) => element(name), adoptedStyleSheets: [websiteSheet] };
   const listeners = [];
-  const settings = { version: 1, enabled: true, selected: ["dyslexia:Readable font"], colorVision: { mode: "protan", strength: 70, cues: true } };
+  const settings = { version: 1, enabled: true, selected: ["dyslexia:Readable font", "vision:Larger text and controls", "vision:Higher contrast"], colorVision: { mode: "protan", strength: 70, cues: true } };
   const context = vm.createContext({ document, URL, CSSStyleSheet: class { replaceSync(css) { this.css = css; } }, chrome: {
     storage: { local: { get: async () => ({ settings }) }, onChanged: { addListener: fn => listeners.push(fn) } }
   } });
   const helper = readFileSync("client/public/color-vision.js", "utf8");
   const source = readFileSync("client/public/content.js", "utf8");
   vm.runInContext(helper, context);
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   function assertActive(mode, strength) {
@@ -80,11 +197,14 @@ test("colour assistance updates and removes its own SVG and styles across save, 
     assert.equal(filter.children[0].attributes.values, context.clearspaceColorVision.matrix({ mode, strength }));
   }
   assertActive("protan", 70);
+  assert.match(document.adoptedStyleSheets[1].css, /zoom: 1.25/);
+  assert.doesNotMatch(document.adoptedStyleSheets[1].css, /color-scheme:/);
   assert.match(document.adoptedStyleSheets[1].css, /https:\/\/example\.test\/article#clearspace-colour-/);
   assert.match(document.adoptedStyleSheets[1].css, /font-family: Arial/);
   assert.match(document.adoptedStyleSheets[1].css, /dashed/);
   // The same scripts are injected every time the user applies to this tab.
   vm.runInContext(helper, context);
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   assertActive("protan", 70);
@@ -110,6 +230,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
 test("colour palettes preserve neutral colours and opacity; zero strength is identity", () => {
   const context = vm.createContext({});
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   const { normalize, matrix } = context.clearspaceColorVision;
   const identity = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0";
   for (const mode of ["protan", "deutan", "tritan"]) {
@@ -143,6 +264,7 @@ test("content injection acknowledges application and reports asynchronous failur
     } },
   });
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   const source = readFileSync("client/public/content.js", "utf8");
   const failure = await vm.runInContext(source, context);
   assert.equal(failure.applied, false);
@@ -163,6 +285,17 @@ test("Save connects open websites with automatic access and requires a page ackn
   const injected = [];
   let automatic = true;
   let acknowledge = true;
+  let injectionError;
+  let pageError;
+  let applied = 0;
+  const page = vm.createContext({
+    chrome: { storage: { local: { get: async () => ({ settings: { enabled: true } }) } } },
+    clearspaceApply(settings) {
+      assert.equal(settings.enabled, true);
+      if (pageError) throw new Error(pageError);
+      applied++;
+    },
+  });
   globalThis.location = { search: "" };
   globalThis.chrome = {
     runtime: { id: "clearspace-test" }, storage: {},
@@ -170,20 +303,53 @@ test("Save connects open websites with automatic access and requires a page ackn
     tabs: { query: async () => [{ id: 7 }, { id: 8 }] },
     scripting: { executeScript: async options => {
       injected.push(options);
+      if (injectionError) throw new Error(injectionError);
       if (options.target.tabId === 8) throw new Error("Protected website");
-      return [{ frameId: 0, result: acknowledge ? { applied: true } : undefined }];
+      // File injection may have no useful completion value. The explicit
+      // verification function must still apply settings and confirm success.
+      if (options.files) return [{ frameId: 0, documentId: "document-7", result: undefined }];
+      const result = await vm.runInContext(`(${options.func.toString()})()`, page);
+      return [{ frameId: 0, result: acknowledge ? result : undefined }];
     } },
   };
   const { applyToTarget } = await import("../client/src/settings.js?extension-test");
   assert.match(await applyToTarget(), /applied to 1 website tab/);
-  assert.deepEqual(injected.map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(injected[0].files, ["color-vision.js", "content.js"]);
+  assert.deepEqual(injected.filter(item => item.files).map(item => item.target.tabId), [7, 8]);
+  assert.deepEqual(injected[0].files, ["color-vision.js", "low-vision.js", "content.js"]);
+  assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
+  assert.equal(applied, 1);
   automatic = false;
   await assert.rejects(applyToTarget(), /no website is connected/);
   globalThis.location.search = "?tab=7";
   assert.match(await applyToTarget(), /applied to 1 website tab/);
   acknowledge = false;
   await assert.rejects(applyToTarget(), /could not be adjusted/);
+  acknowledge = true;
+  pageError = "Styles could not be installed";
+  await assert.rejects(applyToTarget(), /Styles could not be installed/);
+  pageError = undefined;
+  delete page.clearspaceApply;
+  await assert.rejects(applyToTarget(), /page script did not start/);
+  injectionError = "Cannot access contents of the page. Extension manifest must request permission";
+  await assert.rejects(applyToTarget(), /toolbar icon.*grant access/);
+  injectionError = "Cannot access a chrome:// URL";
+  assert.match(await applyToTarget(), /^Settings saved\. Chrome protects this page.*toolbar icon there/);
+  injectionError = undefined;
+  automatic = true;
+  globalThis.location.search = "?tab=8";
+  const executeScript = globalThis.chrome.scripting.executeScript;
+  globalThis.chrome.scripting.executeScript = async options => {
+    if (options.target.tabId === 8) throw new Error("Cannot access a chrome:// URL");
+    return executeScript(options);
+  };
+  page.clearspaceApply = () => {};
+  assert.match(await applyToTarget(), /^Settings saved and applied to 1 website tab\. Chrome protects this page/);
+  globalThis.chrome.scripting.executeScript = executeScript;
+  automatic = false;
+  globalThis.location.search = "?tab=7";
+  injectionError = "No tab with id: 7";
+  await assert.rejects(applyToTarget(), /reconnect it/);
+  injectionError = undefined;
   automatic = true;
   globalThis.chrome.tabs.query = async () => [];
   globalThis.location.search = "";

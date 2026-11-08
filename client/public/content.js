@@ -12,9 +12,11 @@
     return applySavedSettings();
   }
   let sheet;
+  let restoreContrast;
   let filterSvg;
   // An identifier, not a security token; works on ordinary HTTP pages too.
   const filterId = `clearspace-colour-${Math.random().toString(36).slice(2)}`;
+  const lowVisionOptions = new Set(["Larger text and controls", "Higher contrast", "More visible links", "More visible keyboard focus"]);
   const rules = {
     "Reduce motion": "*, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }",
     "Readable font": "body :where(p, li, a, h1, h2, h3, h4, h5, h6, button, input, textarea, label) { font-family: Arial, sans-serif !important; }",
@@ -26,13 +28,16 @@
     "Keyboard focus indicators": ":focus-visible { outline: 3px solid #005fcc !important; outline-offset: 3px !important; box-shadow: 0 0 0 6px #fff !important; }"
   };
   globalThis.clearspaceApply = settings => {
+    restoreContrast?.();
+    restoreContrast = undefined;
     if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter(item => item !== sheet);
     sheet = undefined;
     filterSvg?.remove();
     filterSvg = undefined;
     if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) return;
-    const names = new Set(settings.selected.filter(item => typeof item === "string" && !item.startsWith("vision:")).map(item => item.split(":")[1]));
-    let css = [...names].map(name => rules[name] || "").join("\n");
+    const names = new Set(settings.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || lowVisionOptions.has(item.slice(7)))).map(item => item.split(":")[1]));
+    // Apply low-vision rules last so their stronger link/focus cues win in combinations.
+    let css = [...names].filter(name => !lowVisionOptions.has(name)).map(name => rules[name] || "").join("\n");
     const colour = globalThis.clearspaceColorVision.normalize(settings.colorVision);
     if (colour.mode !== "off" && colour.strength > 0) {
       const ns = "http://www.w3.org/2000/svg";
@@ -60,10 +65,14 @@
         body :where(button, input, select, textarea) { border: 2px solid currentColor !important; }
         body :where([aria-invalid="true"]) { outline: 3px dashed currentColor !important; outline-offset: 3px !important; }`;
     }
-    if (!css) return;
-    sheet = new CSSStyleSheet();
-    sheet.replaceSync(css);
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    const strengths = globalThis.clearspaceLowVision.normalize(settings.lowVision);
+    css += [...lowVisionOptions].filter(name => names.has(name)).map(name => globalThis.clearspaceLowVision.rules(name, strengths[name])).filter(Boolean).map(rule => `\n${rule}`).join("");
+    if (css) {
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    }
+    if (names.has("Higher contrast")) restoreContrast = globalThis.clearspaceLowVision.applyContrast(document.body, strengths["Higher contrast"]);
   };
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.settings) globalThis.clearspaceApply(changes.settings.newValue);
