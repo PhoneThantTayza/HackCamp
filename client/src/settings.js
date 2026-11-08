@@ -1,19 +1,23 @@
-export const unsupported = new Set(["Reading guide", "Simplified layout", "Clear headings", "Shorter paragraphs"]);
 import "../public/focus-mode.js";
 export const focusMode = globalThis.clearspaceFocusMode;
+import { emptyDyslexia, restoreDyslexia } from "./dyslexia-settings.js";
+
 import "../public/color-vision.js";
 import "../public/low-vision.js";
 import "../public/light-sensitivity.js";
+import "../public/dyslexia.js";
 export const lightSensitivity = globalThis.clearspaceLightSensitivity;
 export const lightSensitivityOptions = lightSensitivity.options;
 export const lowVision = globalThis.clearspaceLowVision;
 export const colorVision = globalThis.clearspaceColorVision;
 export const lowVisionOptions = lowVision.options;
-export const defaults = { version: 1, enabled: true, selected: [], light: false, colorVision: colorVision.normalize(), lowVision: lowVision.normalize(), lightSensitivity: lightSensitivity.normalize(), focusMode: focusMode.normalize() };
+export const dyslexia = globalThis.clearspaceDyslexia;
+export const unsupported = new Set(["Reading guide", "Simplified layout", "Clear headings", "Shorter paragraphs"]);
+export const defaults = { version: 1, enabled: true, selected: [], light: false, colorVision: colorVision.normalize(), lowVision: lowVision.normalize(), lightSensitivity: lightSensitivity.normalize(), focusMode: focusMode.normalize(), dyslexia: emptyDyslexia() };
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id && globalThis.chrome?.storage);
 export async function loadSettings() {
   const saved = isExtension ? (await chrome.storage.local.get("settings")).settings : JSON.parse(localStorage.getItem("clearspace-demo") || "null");
-  return { ...defaults, ...saved, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
+  return { ...defaults, ...saved, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
 }
 export async function saveSettings(settings) {
   if (isExtension) await chrome.storage.local.set({ settings });
@@ -32,7 +36,7 @@ export async function applyToTarget() {
     throw new Error("Settings saved, but no website is connected. Open the website you want to adjust, click the Clearspace toolbar icon, then Save and apply. Or select Allow site access here to apply automatically.");
   }
   const results = await Promise.allSettled([...targetIds].map(async tabId => {
-    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "content.js"], world: "ISOLATED" });
+    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], world: "ISOLATED" });
     const main = injected.find(frame => frame.frameId === 0);
     // Verify explicitly instead of relying on the completion value of a batch
     // of script files. Pin verification to the injected document if available.
