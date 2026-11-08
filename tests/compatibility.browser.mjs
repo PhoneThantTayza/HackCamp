@@ -59,6 +59,53 @@ const styles = selector => page.locator(selector).evaluate(element => {
 });
 const settled = () => page.waitForFunction(() => [...document.querySelector('#plain').attributes].some(a => a.name.startsWith('data-cs-reading-')));
 try {
+  await check('settings autosave and apply rapid changes without blocking controls', async () => {
+    const options = await browser.newPage();
+    await options.addInitScript(() => {
+      window.settingsWrites = [];
+      window.appliedSettings = [];
+      window.chrome = {
+        runtime: { id: 'autosave-test' },
+        storage: { local: {
+          get: async () => ({ settings: JSON.parse(localStorage.getItem('test-settings') || 'null') }),
+          set: async ({ settings }) => {
+            await new Promise(resolve => setTimeout(resolve, 80));
+            localStorage.setItem('test-settings', JSON.stringify(settings));
+            settingsWrites.push(settings);
+          },
+        } },
+        permissions: { contains: async () => false },
+        scripting: { executeScript: async details => {
+          if (details.func) {
+            appliedSettings.push(JSON.parse(localStorage.getItem('test-settings')));
+            return [{ frameId: 0, result: { applied: true } }];
+          }
+          return [{ frameId: 0 }];
+        } },
+      };
+    });
+    try {
+      await options.goto(base + '/options?tab=1');
+      await options.getByRole('button', { name: /^Motor \/ mobility/ }).click();
+      const first = options.getByLabel('Larger click targets', { exact: true });
+      await first.check();
+      await options.getByLabel('Extra button spacing', { exact: true }).check();
+      await first.uncheck();
+      await options.waitForFunction(() => appliedSettings.at(-1)?.selected.join() === 'motor:Extra button spacing');
+      assert.equal(await options.getByRole('button', { name: 'Save and apply', exact: true }).count(), 0);
+      assert.equal(await options.getByRole('switch').count(), 0);
+      assert.equal(await options.evaluate(() => appliedSettings.at(-1)?.enabled), true);
+      await options.reload();
+      await options.getByRole('button', { name: /^Motor \/ mobility/ }).click();
+      assert.equal(await options.getByLabel('Extra button spacing', { exact: true }).isChecked(), true);
+      assert.equal(await options.getByRole('switch').count(), 0);
+      assert.equal(await options.evaluate(() => settingsWrites.length), 0);
+      await options.getByRole('button', { name: 'Clear all', exact: true }).click();
+      await options.waitForFunction(() => appliedSettings.at(-1)?.selected.length === 0);
+      await options.getByRole('button', { name: 'Reset choices', exact: true }).click();
+      await options.waitForFunction(() => appliedSettings.at(-1)?.enabled === true);
+    } finally { await options.close(); }
+  });
   await check('static text includes code and buttons; editors/icons stay intact', async () => {
     await load('/simple');
     const before = await styles('#nested'); const code = await styles('#code'); const edit = await styles('#editable'); const icon = await styles('#icon'); const inlineCode = await styles('#inline-code');
@@ -315,7 +362,7 @@ try {
     await page.getByLabel('Letters or words are difficult to distinguish', {exact:true}).check();
     await page.getByText('Customize suggested changes',{exact:true}).click();
     await page.getByLabel('Highlight the word under your pointer',{exact:true}).selectOption('false');
-    await page.getByRole('button',{name:'Save and apply',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Save and apply',exact:true}).count(),0);
     await page.getByRole('status').filter({hasText:'Demo settings saved'}).waitFor();
     await page.reload(); await page.getByRole('button', {name:/Dyslexia Reading at your rhythm/}).click();
     assert.equal(await page.getByLabel('Letters or words are difficult to distinguish',{exact:true}).isChecked(),true);
@@ -444,7 +491,7 @@ try {
     const voice=page.getByLabel('Read-aloud voice',{exact:true});
     assert.equal(await voice.inputValue(),'');
     assert.equal(await voice.locator('option:checked').textContent(),'Auto-detect language');
-    await page.getByRole('button',{name:'Save and apply',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Save and apply',exact:true}).count(),0);
     await page.getByRole('status').filter({hasText:'Demo settings saved'}).waitFor();
     await page.reload();await page.getByRole('button',{name:/Dyslexia Reading at your rhythm/}).click();
     assert.equal(await page.getByLabel('Read-aloud voice',{exact:true}).locator('option:checked').textContent(),'Auto-detect language');
