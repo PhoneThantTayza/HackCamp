@@ -379,7 +379,6 @@ function MotorControls({ options, ...props }) {
       const shown = section.options.filter(option => options.includes(option)); // respects the card's search
       return shown.length > 0 && <MotorSection key={section.id} section={section} options={shown} {...props} />;
     })}
-    <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
   </div>;
 }
 

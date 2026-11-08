@@ -153,3 +153,5 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .motor-range-ends { display: flex; justify-content: space-between; font-size: 0.75rem; margin-top: 0.25rem; }
 .motor-sample { display: flex; flex-wrap: wrap; align-items: center; }
 .motor-motion-list { list-style: none; padding: 0; margin: 0.25rem 0 0; display: grid; gap: 0.25rem; font-size: 0.875rem; }
+/* The card already has a line above its options, so the first Motor slide-down doesn't need its own */
+#motor-options > .low-vision-controls:first-child { border-top: 0; margin-top: 0; padding-top: 6px; }
