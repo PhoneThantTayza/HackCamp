@@ -13,7 +13,8 @@ const CLIENT_ID = process.env.AUTH0_CLIENT_ID || 'lXZhBKJAB3KVeANrjy2G1nfcl6Lp0t
 const AUDIENCE = process.env.AUTH0_AUDIENCE || 'https://accessify-api';
 const PORT = 53682;
 const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
-export const API = process.env.CLEARSPACE_API_URL || 'http://localhost:3000';
+// 127.0.0.1 (not "localhost"): Node may try IPv6 ::1 first, where the dev server may not listen.
+export const API = process.env.CLEARSPACE_API_URL || 'http://127.0.0.1:3000';
 
 const base64url = buffer => buffer.toString('base64url');
 const decodeJwt = token => { try { return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()); } catch { return {}; } };
@@ -92,10 +93,15 @@ export class Auth {
   // Call our server with the login token attached.
   async api(method, body) {
     if (!this.session) throw new Error('Please sign in first.');
-    const response = await fetch(`${API}/api/preferences`, {
-      method, headers: { Authorization: `Bearer ${this.session.accessToken}`, 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let response;
+    try {
+      response = await fetch(`${API}/api/preferences`, {
+        method, headers: { Authorization: `Bearer ${this.session.accessToken}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch {
+      throw new Error(`Can't reach the server at ${API}. Is "npm run dev" running?`);
+    }
     const data = await response.json().catch(() => ({}));
     if (response.status === 401) { this.#write(null); throw new Error('Please sign in again.'); }
     if (!response.ok) throw new Error(data.error || `Server error (${response.status}).`);
