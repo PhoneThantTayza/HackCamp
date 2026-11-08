@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Clearspace",
+  "version": "1.0.0",
+  "description": "Reversible reading and accessibility adjustments for webpages.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Open Clearspace for this tab" },
+  "options_page": "index.html"
+}
