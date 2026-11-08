@@ -1,6 +1,5 @@
 import express from "express";
 import ViteExpress from "vite-express";
-import { preferencesRouter } from "./preferences.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -15,9 +14,6 @@ app.use(express.json({ limit: "100kb" }));
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
-
-// Account sync for logged-in users (see preferences.js)
-app.use("/api/preferences", preferencesRouter());
 
 app.use("/api", (_req, res) => {
   res.status(404).json({ error: "API route not found" });

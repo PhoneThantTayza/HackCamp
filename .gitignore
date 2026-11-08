@@ -7,7 +7,6 @@ pnpm-lock.yaml
 yarn-error.log
 
 dist/
-release/
 build/
 out/
 .next/
@@ -70,5 +69,3 @@ $RECYCLE.BIN/
 AGENTS.md
 CLAUDE.md
 INSTRUCTIONS.md
-# Clearspace account sync data (people's saved settings)
-server/data/

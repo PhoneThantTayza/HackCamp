@@ -1,7 +1,0 @@
-body { width: 290px; padding: 18px; margin: 0; font: 14px/1.5 system-ui,sans-serif; color: #294334; background: #f5f4ef; }
-h1 { font-size: 24px; margin: 0 0 10px; }
-p { font-size: 12px; }
-button { display: block; width: 100%; min-height: 44px; padding: 9px; margin: 9px 0; border: 1px solid #cad1c4; border-radius: 7px; background: white; color: inherit; cursor: pointer; }
-button:first-of-type { background: #285b49; color: white; }
-#status { padding: 10px; background: #e8eddf; border-radius: 7px; overflow-wrap: anywhere; }
-:focus-visible { outline: 3px solid #527544; outline-offset: 3px; }

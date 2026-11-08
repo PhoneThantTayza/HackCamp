@@ -9,6 +9,5 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
-    rollupOptions: { input: { extension: 'client/index.html', desktop: 'client/desktop.html' } },
   },
 });
