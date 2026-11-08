@@ -137,6 +137,9 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .dyslexia-choice-summary::-webkit-details-marker { display: none; }
 .dyslexia-choice-summary > .option-row { padding: 9px 0; margin: 0; }
 .dyslexia-choice-summary:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+.dyslexia-choice-summary > .option-row { flex: 1; min-width: 0; }
+.dyslexia-label-copy { min-width: 0; overflow-wrap: anywhere; }
+.dyslexia-live-label { display: block; }
 .dyslexia-choice-content { padding: 0 0 12px 23px; }
 .dyslexia-choice-content .dyslexia-help { margin: 0; }
 .dyslexia-choice-content .dyslexia-help:first-child { margin-top: 8px; }
@@ -144,6 +147,10 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .dyslexia-customization summary { cursor: pointer; line-height: 1.7; margin-bottom: 12px; }
 .dyslexia-field { display: grid; gap: 6px; margin-bottom: 14px; line-height: 1.5; }
 .dyslexia-field input, .dyslexia-field select { width: 100%; min-width: 0; min-height: 36px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px; font: inherit; }
+.dyslexia-slider-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.dyslexia-slider-heading output { font-size: 11px; font-variant-numeric: tabular-nums; }
+.dyslexia-field input[type=range] { padding: 0; border: 0; background: transparent; accent-color: var(--text); cursor: pointer; }
+.dyslexia-slider-reset { justify-self: start; font-size: 11px; }
 .dyslexia-color { margin-bottom: 10px; }
 .dyslexia-color input[type=color] { width: 100%; height: 36px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 .dyslexia-card select:focus-visible, .dyslexia-card summary:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }

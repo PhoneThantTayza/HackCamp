@@ -17,6 +17,17 @@ export const defaults = { version: 1, enabled: true, selected: [], light: false,
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id && globalThis.chrome?.storage);
 export async function loadSettings() {
   const saved = isExtension ? (await chrome.storage.local.get("settings")).settings : JSON.parse(localStorage.getItem("clearspace-demo") || "null");
+  if (saved?.selected?.includes('cognitive:Focus mode')) {
+    const shared = restoreDyslexia(saved);
+    if (!shared.experiences.losePlace) {
+      const previous = focusMode.normalize(saved.focusMode);
+      Object.assign(shared.customization, { guideSize: Math.min(160, previous.height), dimming: Math.min(0.6, previous.dimming / 100) });
+    }
+    shared.experiences.losePlace = true;
+    delete shared.customization.guide;
+    saved.dyslexia = shared;
+    saved.selected = saved.selected.filter(option => option !== 'cognitive:Focus mode');
+  }
   return { ...defaults, ...saved, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
 }
 export async function saveSettings(settings) {

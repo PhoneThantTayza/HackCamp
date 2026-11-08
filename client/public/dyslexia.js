@@ -1,6 +1,6 @@
 // Local reading tools: no copied HTML, word wrappers, or replacement of app nodes.
 (() => {
-  if (globalThis.clearspaceDyslexia?.version === 4) return;
+  if (globalThis.clearspaceDyslexia?.version === 5) return;
   const fonts = { sans: 'Arial, Helvetica, sans-serif', serif: 'Georgia, serif', system: 'system-ui, sans-serif' };
   const presets = {
     distinguishWords: { font: 'sans', letterSpacing: 0.06, wordSpacing: 0.12, wordHighlight: true },
@@ -10,6 +10,34 @@
   };
   const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const color = value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : null;
+  function luminance(rgb) {
+    return rgb.slice(0, 3).map(channel => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  }
+  function contrast(a, b) {
+    const x = luminance(a), y = luminance(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  }
+  function chooseHighlight(text, background) {
+    // Search neutral, warm and cool shades, retaining the actual chosen shade.
+    // Text readability is mandatory; balance a 7:1 text goal with a 3:1
+    // highlight/page goal where those can coexist. These are selection goals,
+    // not a claim that every possible source colour can meet both.
+    let best = [0, 0, 0], bestScore = -1;
+    for (let level = 0; level <= 255; level++) {
+      for (const candidate of [[level, level, level], [level, level, Math.max(0, level - 35)],
+        [Math.max(0, level - 25), level, level]]) {
+        const textContrast = contrast(text, candidate);
+        if (textContrast < 4.5) continue;
+        const pageContrast = contrast(background, candidate);
+        const score = Math.min(textContrast / 7, pageContrast / 3);
+        if (score > bestScore) { bestScore = score; best = candidate; }
+      }
+    }
+    return best;
+  }
   const limits = { letterSpacing: [0, 0.2], wordSpacing: [0, 0.5], lineHeight: [1, 2.5], lineLength: [30, 100],
     paragraphSpacing: [0, 2], guideSize: [20, 160], dimming: [0, 0.6], allTextContrast: [0, 1] };
   function suggest(preferences = {}, context = {}) {
@@ -255,79 +283,44 @@
     function channels(color) {
       colorContext.clearRect(0, 0, 1, 1);
       colorContext.fillStyle = color; colorContext.fillRect(0, 0, 1, 1);
-      return [...colorContext.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      const rgba = [...colorContext.getImageData(0, 0, 1, 1).data];
+      return [...rgba.slice(0, 3), rgba[3] / 255];
     }
-    function luminance(rgb) {
-      return rgb.map(channel => {
-        const value = channel / 255;
-        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-      }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    function composite(front, back) {
+      return front.slice(0, 3).map((value, index) => value * front[3] + back[index] * (1 - front[3]));
     }
-    function contrast(a, b) {
-      const [x, y] = [luminance(a), luminance(b)];
-      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
-    }
-    function backgroundFor(fill, elementBg, isLink = false) {
-      const cacheKey = fill + '|' + elementBg;
+    function backgroundFor(element, computed) {
+      const layers = [];
+      for (let current = element; current; current = current.parentElement ?? current.getRootNode().host) {
+        const style = current === element ? computed : view.getComputedStyle(current);
+        const layer = channels(style.backgroundColor);
+        layers.push(layer);
+        if (layer[3] === 1) break;
+      }
+      // Resolve transparent backgrounds through ancestors, including shadow hosts.
+      // Images/gradients and blend/filter effects cannot be sampled this way.
+      let background = channels('Canvas').slice(0, 3);
+      for (const layer of layers.reverse()) background = composite(layer, background);
+      const fill = channels(computed.webkitTextFillColor || computed.color);
+      const cacheKey = [...fill, ...background].join(',');
       if (backgroundCache.has(cacheKey)) return backgroundCache.get(cacheKey);
-      const text = channels(fill);
-      const bgColor = channels(elementBg);
-      // Check if element has a meaningful (non-transparent) background.
-      const hasRealBg = elementBg !== 'transparent' && elementBg !== 'rgba(0, 0, 0, 0)' &&
-        !elementBg.startsWith('rgba(0, 0, 0, 0') && bgColor.some(c => c !== 0) &&
-        !(elementBg === 'rgb(0, 0, 0)' && elementBg === 'transparent');
-      // Detect blue-ish link colors (hue ~220-260, decent saturation)
-      const [r, g, b] = text;
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      const saturation = max === 0 ? 0 : (max - min) / max;
-      const isBlueLink = !isLink && b > r && b > g && b - Math.max(r, g) > 40 && saturation > 0.3;
-      // Pure black for dark, cream for light.
-      const cream = [255, 248, 235];
-      const black = [0, 0, 0];
-      // Build candidate bases: existing background (if real) + cream/black.
-      const bases = [];
-      if (hasRealBg) bases.push(bgColor);
-      bases.push(cream, black);
-      // Pick base that contrasts with BOTH text AND element background (if real).
-      // For the existing bg, only check text contrast (it's already the background).
-      let bestBase = bases[0];
-      let bestScore = -1;
-      for (const base of bases) {
-        const textContrast = contrast(text, base);
-        const bgContrast = hasRealBg && base !== bgColor ? contrast(bgColor, base) : Infinity;
-        const score = Math.min(textContrast, bgContrast);
-        if (score > bestScore) {
-          bestScore = score;
-          bestBase = base;
+      // Translucent text is composited over each candidate before scoring.
+      const text = fill[3] === 1 ? fill.slice(0, 3) : null;
+      let chosen;
+      if (text) chosen = chooseHighlight(text, background);
+      else {
+        let bestScore = -1;
+        for (let level = 0; level <= 255; level++) {
+          const candidate = [level, level, level];
+          const readable = contrast(composite(fill, candidate), candidate);
+          const score = Math.min(readable / 7, contrast(background, candidate) / 3);
+          if (readable >= 4.5 && score > bestScore) { bestScore = score; chosen = candidate; }
         }
+        // If the original alpha makes readable highlighting impossible, leave it alone.
+        if (!chosen) return null;
       }
-      // If existing background already provides good contrast (7:1), use it as-is.
-      if (hasRealBg && bestBase === bgColor && contrast(text, bgColor) >= 7) {
-        const hex = toHex(bgColor);
-        backgroundCache.set(cacheKey, hex);
-        return hex;
-      }
-      const extreme = bestBase === cream ? 255 : (bestBase === black ? 0 : null);
-      let highlightBg = bestBase;
-      // If we're using an existing bg as base, push toward cream or black for better contrast.
-      if (hasRealBg && bestBase === bgColor) {
-        // Pick direction: toward cream if text is dark, toward black if text is light.
-        const textLum = luminance(text);
-        extreme = textLum > 0.5 ? 0 : 255;
-      }
-      // Push toward extreme until contrast reaches 7:1 with text.
-      if (extreme !== null) {
-        for (let t = 0; t <= 1 && contrast(text, highlightBg) < 7; t += 0.05) {
-          highlightBg = bestBase.map((channel, i) => {
-            const target = extreme === 255 ? 255 : 0;
-            return channel + (target - channel) * t;
-          });
-        }
-      }
-      // Snap to pure cream or pure black for consistency.
-      if (highlightBg[0] > 200) highlightBg = cream;
-      else highlightBg = black;
-      const hex = toHex(highlightBg);
+      const hex = toHex(chosen);
+      if (backgroundCache.size >= 512) backgroundCache.clear();
       backgroundCache.set(cacheKey, hex);
       return hex;
     }
@@ -344,10 +337,8 @@
         if (!/\S/.test(text.data) || !safe(text.parentElement)) continue;
         const computed = view.getComputedStyle(text.parentElement);
         if (computed.visibility !== 'visible' || computed.display === 'none') continue;
-        const isLink = text.parentElement.closest('a') !== null;
-        const textColor = computed.webkitTextFillColor || computed.color;
-        const elementBg = computed.backgroundColor;
-        const bg = backgroundFor(textColor, elementBg, isLink);
+        const bg = backgroundFor(text.parentElement, computed);
+        if (!bg) continue;
         const name = `${passageName}-${bg.slice(1)}`;
         if (!passageBackgrounds.has(name)) { passageBackgrounds.set(name, bg); dirty = true; }
         if (!groups.has(name)) groups.set(name, new view.Highlight());
@@ -374,10 +365,8 @@
         if (!/\S/.test(text.data) || !safe(text.parentElement)) continue;
         const computed = view.getComputedStyle(text.parentElement);
         if (computed.visibility !== 'visible' || computed.display === 'none') continue;
-        const isLink = text.parentElement.closest('a') !== null;
-        const textColor = computed.webkitTextFillColor || computed.color;
-        const elementBg = computed.backgroundColor;
-        const bg = backgroundFor(textColor, elementBg, isLink);
+        const bg = backgroundFor(text.parentElement, computed);
+        if (!bg) continue;
         const name = `${passageName}-${bg.slice(1)}`;
         if (!passageBackgrounds.has(name)) { passageBackgrounds.set(name, bg); dirty = true; }
         if (!groups.has(name)) groups.set(name, new view.Highlight());
@@ -522,5 +511,5 @@
     }
     return { apply, update: apply, enable: apply, reset, disable: reset };
   }
-  globalThis.clearspaceDyslexia = Object.freeze({ version: 4, suggest, createController });
+  globalThis.clearspaceDyslexia = Object.freeze({ version: 5, suggest, createController, chooseHighlight });
 })();

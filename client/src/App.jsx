@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { defaults, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
+import DyslexiaSlider from './DyslexiaSlider.jsx';
 
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
@@ -176,7 +177,28 @@ function FocusModeControls({ value, onChange, enabled }) {
   </div>;
 }
 
-function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
+function DyslexiaLabel({ id, label, value, active, interacting }) {
+  const host = useRef(null);
+  useEffect(() => {
+    const root = host.current.shadowRoot ?? host.current.attachShadow({ mode: 'open' });
+    const text = document.createElement('p');
+    text.style.margin = '0';
+    text.textContent = label;
+    root.append(text);
+    const controller = globalThis.clearspaceDyslexia.createController(root);
+    if (active) controller.apply({
+      experiences: { [id]: true },
+      // Avoid the engine's document-wide contrast scan in a local preview.
+      customization: { ...value.customization, allTextContrast: false,
+        ...(!interacting ? { guide: false, wordHighlight: false, focusParagraph: false } : {}) },
+    });
+    return () => { controller.reset(); text.remove(); };
+  }, [id, label, active, interacting, value.customization]);
+  return <span ref={host} className="dyslexia-live-label" />;
+}
+
+function DyslexiaControls({ value, onChange, enabled, speechReset, query, mutualOnly = false, prefix = 'dyslexia' }) {
+  const [previewChoice, setPreviewChoice] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
   const [expandedChoices, setExpandedChoices] = useState(() => ({ ...value.experiences }));
   const custom = value.customization;
@@ -191,7 +213,7 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
       ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Word explanations coming later.', true],
     ], note: 'Summaries and simpler language coming later.' },
     { title: 'Reading focus & tracking', choices: [
-      ['losePlace', 'I lose my place while reading', 'Pointer-following guide over text and controls. Right-click toggles.'],
+      ['losePlace', 'Focus mode', 'Shared by Dyslexia and Cognitive. A colored reading band follows your pointer. Right-click toggles.'],
     ] },
     { title: 'Reading pace & listening', choices: [
       ['preferListening', 'I prefer listening to text', 'Highlight text to hear it read aloud. Escape stops.'],
@@ -218,10 +240,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
     distinguishWords: ['font', 'letterSpacing', 'wordSpacing', 'wordHighlight', 'allTextContrast'],
     readingFatigue: ['focusParagraph', 'dimming'],
     overwhelmingParagraphs: ['lineHeight', 'lineLength', 'paragraphSpacing', 'alignStart'],
-    losePlace: ['guide', 'guideSize', 'guideColor'],
+    losePlace: ['guideSize', 'dimming', 'guideColor'],
   };
 
-  const filtered = sections.map(section => ({ ...section, choices: section.choices.filter(choice =>
+  const filtered = sections.filter(section => !mutualOnly || section.choices.some(([id]) => id === 'losePlace')).map(section => ({ ...section, choices: section.choices.filter(choice =>
     `${section.title} ${choice[1]} ${choice[2]}`.toLowerCase().includes(query.toLowerCase())) })).filter(section => section.choices.length);
 
   return <div className="dyslexia-controls">
@@ -230,27 +252,32 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
         <button type="button" className="clear-button" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Clear custom overrides</button>
       </div>}
       {filtered.map(section => {
-        const sectionId = `dyslexia-section-${section.choices[0][0]}`;
-        const expanded = Boolean(expandedSections[section.title] || query);
+        const sectionId = `${prefix}-section-${section.choices[0][0]}`;
+        const expanded = Boolean(mutualOnly || expandedSections[section.title] || query);
         return <section className="dyslexia-section" key={section.title}>
-        <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={expanded} aria-controls={sectionId}
+        {!mutualOnly && <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={expanded} aria-controls={sectionId}
           onClick={() => setExpandedSections(current => ({ ...current, [section.title]: !expanded }))}>
           <span>{section.title}</span><span className={`chevron ${expanded ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
-        </button></h3>
+        </button></h3>}
         <div id={sectionId} hidden={!expanded}>
         {section.choices.map(([id, label, help, unavailable]) => <details key={id} className="dyslexia-choice" open={expandedChoices[id] === true}
           onToggle={event => { const expanded = event.currentTarget.open; setExpandedChoices(current => current[id] === expanded ? current : { ...current, [id]: expanded }); }}>
-          <summary className="dyslexia-choice-summary">
-            <label className="option-row" htmlFor={`dyslexia-${id}`}>
-              <input id={`dyslexia-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
+          <summary className="dyslexia-choice-summary"
+            onPointerEnter={() => setPreviewChoice(id)} onPointerLeave={() => setPreviewChoice(null)}
+            onFocusCapture={() => setPreviewChoice(id)}
+            onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPreviewChoice(null); }}>
+            <label className="option-row" htmlFor={`${prefix}-${id}`}>
+              <input id={`${prefix}-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
                 onChange={event => {
                   const checked = event.target.checked;
                   setExpandedChoices(current => ({ ...current, [id]: checked }));
                   onChange({ ...value, enabled: true, experiences: { ...value.experiences, [id]: checked } });
                 }} />
-              <span>{label}<small className="muted block">{help}</small></span>
+              <span className="dyslexia-label-copy"><DyslexiaLabel id={id} label={label} value={value}
+                interacting={previewChoice === id}
+                active={!unavailable && (previewChoice === id || value.experiences[id] === true)} />
+                <small className="muted block">{help}</small></span>
             </label>
-            <span className={`chevron ${expandedChoices[id] ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
           </summary>
           <div className="dyslexia-choice-content">
             {fieldsByChoice[id] && <div className="dyslexia-customization">
@@ -259,12 +286,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
             <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
           </select>
         </label>}
-        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
-          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
-            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
-            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
-        </label>)}
-        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
+        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(field => <DyslexiaSlider key={field[0]}
+          field={field} custom={custom} onChange={customize}
+          suggested={globalThis.clearspaceDyslexia.suggest({ ...value, experiences: { ...value.experiences, [id]: true } })} />)}
+        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['alignStart', 'Align to reading direction']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
           <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
             <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
           </select>
@@ -284,7 +309,6 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
         </div>
       </section>; })}
       {!filtered.length && <p className="muted text-xs">No matching experiences.</p>}
-      <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
   </div>;
 }
 
@@ -292,8 +316,8 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
   const [open, setOpen] = useState(group.id === "vision");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const count = group.options.filter(option => selected.includes(`${group.id}:${option}`)).length + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
-  const options = group.options.filter(option => option.toLowerCase().includes(query.toLowerCase()));
+  const count = group.options.filter(option => option !== 'Focus mode' && selected.includes(`${group.id}:${option}`)).length + (group.id === 'cognitive' ? Number(dyslexia.experiences.losePlace === true) : 0) + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
+  const options = group.options.filter(option => option !== 'Focus mode' && option.toLowerCase().includes(query.toLowerCase()));
   const showColour = group.id === "vision" && "colour color blindness protan deutan tritan red green blue yellow strength cues".includes(query.toLowerCase());
   const showLowVision = group.id === "vision" && `low vision strength ${lowVisionOptions.join(" ")}`.toLowerCase().includes(query.toLowerCase());
   const showLight = group.id === "vision" && `light sensitivity brightness dim page soften bright backgrounds warm colour color tint dark page theme strength`.includes(query.toLowerCase());
@@ -318,6 +342,7 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
       {showColour && <ColourVisionControls value={colour} onChange={onColourChange} enabled={enabled} />}
       {showLight && <LightSensitivityControls selected={selected} onToggle={onToggle} enabled={enabled} strengths={lightStrengths} onStrengthChange={onLightChange} />}
       {showLowVision && <LowVisionControls strengths={lowVisionStrengths} onStrengthChange={onLowVisionChange} selected={selected} onToggle={onToggle} enabled={enabled} />}
+      {group.id === "cognitive" && <DyslexiaControls mutualOnly prefix="cognitive" value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} query={query} />}
       {group.id === "dyslexia" && <DyslexiaControls value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} speechReset={speechReset} query={query} />}
     </div>}
   </section>;
@@ -341,7 +366,7 @@ export default function App() {
     setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
   function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeDyslexia(value) { setDyslexia(value); setStatus("Unsaved changes. Select Save and apply."); }
+  function changeDyslexia(value) { const customization = { ...value.customization }; delete customization.guide; setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode')); setStatus("Unsaved changes. Select Save and apply."); }
   function changeColour(value) { setColour(value); setStatus("Unsaved changes. Select Save and apply."); }
   function changeLowVision(value) { setLowVisionStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
   function changeLight(value) { setLightStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
