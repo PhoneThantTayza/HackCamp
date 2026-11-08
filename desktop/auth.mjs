@@ -55,7 +55,8 @@ export class Auth {
         if (url.pathname !== '/callback') { res.writeHead(404).end(); return; }
         const error = url.searchParams.get('error_description') || url.searchParams.get('error');
         if (error || url.searchParams.get('state') !== state) {
-          res.writeHead(400, { 'Content-Type': 'text/html' }).end(page('Login did not finish. You can close this tab.'));
+          const reason = (error || 'The login was interrupted.').replace(/[<>&"]/g, c => `&#${c.charCodeAt(0)};`);
+          res.writeHead(400, { 'Content-Type': 'text/html' }).end(page(`Login did not finish.<br><br><b>Reason from Auth0:</b> ${reason}<br><br>You can close this tab.`));
           return finish(new Error(error || 'Login was interrupted. Please try again.'));
         }
         try {
