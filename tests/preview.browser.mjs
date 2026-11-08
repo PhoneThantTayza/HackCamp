@@ -31,38 +31,36 @@ try {
   await preview.locator('#sample-button').evaluate(element => new Promise(resolve => {
     const poll = () => parseFloat(getComputedStyle(element).minHeight) >= 56 ? resolve() : setTimeout(poll, 20); poll();
   }));
-  assert.equal(await page.evaluate(() => localStorage.getItem('clearspace-demo')), null, 'Drafts must not be saved by preview');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('clearspace-demo'))?.selected.includes('motor:Larger click targets'));
   assert.equal(await page.locator('#clearspace-click-targets-style').count(), 0, 'Controls outside preview stay unaffected');
   await page.locator('button[aria-controls="cognitive-options"]').click();
   await page.getByRole('checkbox', { name: 'Hide distractions' }).check();
   await preview.locator('.ad-banner').waitFor({ state: 'hidden' });
   await preview.locator('aside').waitFor({ state: 'hidden' });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('clearspace-demo'))?.selected.includes('cognitive:Hide distractions'));
+  const savedBeforeComparison = await page.evaluate(() => localStorage.getItem('clearspace-demo'));
   await page.getByRole('button', { name: 'Before adjustments', exact: true }).click();
   await preview.locator('.ad-banner').waitFor({ state: 'visible' });
   await preview.locator('#clearspace-click-targets-style').waitFor({ state: 'detached' });
   assert.equal(await page.getByRole('button', { name: 'Before adjustments', exact: true }).getAttribute('aria-pressed'), 'true');
-  assert.equal(await page.getByRole('switch', { name: 'Enable webpage adjustments' }).isChecked(), true);
+  assert.equal(await page.evaluate(() => localStorage.getItem('clearspace-demo')), savedBeforeComparison, 'Comparison must not change saved settings');
+  assert.equal(await page.getByRole('switch').count(), 0);
   assert.equal(await page.getByRole('checkbox', { name: 'Hide distractions' }).isChecked(), true);
-  // Draft changes in the original view stay unapplied until switching back.
+  // Changes in the original view save automatically while the sample stays unadjusted.
   await page.getByRole('checkbox', { name: 'Larger click targets', exact: true }).uncheck();
   await page.getByRole('button', { name: 'After adjustments', exact: true }).click();
   await preview.locator('.ad-banner').waitFor({ state: 'hidden' });
   assert.equal(await preview.locator('#clearspace-click-targets-style').count(), 0);
   await page.getByRole('checkbox', { name: 'Larger click targets', exact: true }).check();
   await preview.locator('#clearspace-click-targets-style').waitFor({ state: 'attached' });
-  assert.equal(await page.evaluate(() => localStorage.getItem('clearspace-demo')), null, 'Comparison must not save choices');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('clearspace-demo'))?.selected.includes('motor:Larger click targets'));
   await preview.getByRole('button', { name: 'Try a button' }).click();
   assert.match(await preview.locator('#sample-result').textContent(), /You tried the button/);
-  await page.getByRole('switch', { name: 'Enable webpage adjustments' }).uncheck();
-  await preview.locator('.ad-banner').waitFor({ state: 'visible' });
-  await preview.locator('#clearspace-click-targets-style').waitFor({ state: 'detached' });
-  await page.getByRole('switch', { name: 'Enable webpage adjustments' }).check();
-  await preview.locator('.ad-banner').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Clear all', exact: true }).click();
   await preview.locator('.ad-banner').waitFor({ state: 'visible' });
   await preview.locator('#clearspace-click-targets-style').waitFor({ state: 'detached' });
   // Exercise the entire composition through the same message used by the UI.
-  const settings = { version: 1, enabled: true, selected: ['vision:Higher contrast', 'vision:Dim page', 'vision:Larger text and controls', 'motor:Extra button spacing', 'motor:Keyboard focus indicators', 'motor:Reduce motion', 'cognitive:Focus mode'], colorVision: { mode: 'deutan', strength: 50, cues: true }, dyslexia: { enabled: true, experiences: { distinguishWords: true, overwhelmingParagraphs: true }, customization: {} } };
+  const settings = { version: 1, enabled: true, selected: ['vision:Higher contrast', 'vision:Dim page', 'vision:Larger text and controls', 'motor:Extra button spacing', 'motor:Keyboard focus indicators', 'motor:Reduce motion'], colorVision: { mode: 'deutan', strength: 50, cues: true }, dyslexia: { enabled: true, experiences: { distinguishWords: true, overwhelmingParagraphs: true, losePlace: true }, customization: {} } };
   await page.evaluate(settings => document.querySelector('iframe').contentWindow.postMessage({ type: 'clearspace:preview-settings', settings }, location.origin), settings);
   const frame = page.frames().find(frame => frame.url().endsWith('/preview.html'));
   await frame.waitForFunction(() => getComputedStyle(document.documentElement).filter.includes('brightness') && document.documentElement.dataset.a11yfixReduceMotion === 'on');
@@ -70,7 +68,7 @@ try {
   await page.getByRole('button', { name: 'Reset choices', exact: true }).click();
   await frame.waitForFunction(() => getComputedStyle(document.documentElement).filter === 'none' && !document.querySelector('#clearspace-colour'));
   assert.deepEqual(errors, []);
-  console.log('PASS combined preview: live UI updates, isolation, composition, controls, pause, clear and reset');
+  console.log('PASS combined preview: live UI updates, isolation, composition, controls, autosave, comparison, clear and reset');
 } finally {
   await browser?.close();
   await new Promise(done => server.close(done));

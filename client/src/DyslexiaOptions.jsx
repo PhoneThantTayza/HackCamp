@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { dyslexiaChoiceCount } from './dyslexia-settings.js';
 import ReadAloud from './ReadAloud.jsx';
+import DyslexiaSlider from './DyslexiaSlider.jsx';
 
 const sections = [
   { title: 'Reading comfort', choices: [
@@ -90,11 +91,8 @@ export default function DyslexiaOptions({ value, onChange, enabled, speechReset,
             <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
           </select>
         </label>
-        {numberFields.map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
-          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
-            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
-            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
-        </label>)}
+        {numberFields.map(field => <DyslexiaSlider key={field[0]} field={field} custom={custom}
+          suggested={globalThis.clearspaceDyslexia.suggest(value)} onChange={customize} />)}
         {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
           <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
             <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
@@ -106,7 +104,7 @@ export default function DyslexiaOptions({ value, onChange, enabled, speechReset,
         </div>)}
         <button type="button" className="clear-button text-xs" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Use suggested settings</button>
       </details>
-      <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
+      <p className="muted dyslexia-help mt-3">Changes save and apply to connected webpages automatically.</p>
     </div>}
   </section>;
 }

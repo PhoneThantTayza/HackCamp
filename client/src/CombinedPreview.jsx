@@ -12,7 +12,7 @@ export default function CombinedPreview({ settings }) {
       <h2 id="preview-title" className="text-base font-medium">Preview all adjustments</h2>
       <span className="optional-tag">{showOriginal ? "ORIGINAL PAGE" : settings.enabled ? "LIVE PREVIEW" : "ADJUSTMENTS PAUSED"}</span>
     </div>
-    <p className="muted control-description">Your choices work together here immediately. Save and apply to use them on websites.</p>
+    <p className="muted control-description">Your choices work together here immediately and save automatically. Connected websites update as you make changes.</p>
     <div className="preview-comparison" role="group" aria-label="Preview version">
       <button type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(true)}>Before adjustments</button>
       <button type="button" aria-pressed={!showOriginal} onClick={() => setShowOriginal(false)}>After adjustments</button>

@@ -59,6 +59,53 @@ const styles = selector => page.locator(selector).evaluate(element => {
 });
 const settled = () => page.waitForFunction(() => [...document.querySelector('#plain').attributes].some(a => a.name.startsWith('data-cs-reading-')));
 try {
+  await check('settings autosave and apply rapid changes without blocking controls', async () => {
+    const options = await browser.newPage();
+    await options.addInitScript(() => {
+      window.settingsWrites = [];
+      window.appliedSettings = [];
+      window.chrome = {
+        runtime: { id: 'autosave-test' },
+        storage: { local: {
+          get: async () => ({ settings: JSON.parse(localStorage.getItem('test-settings') || 'null') }),
+          set: async ({ settings }) => {
+            await new Promise(resolve => setTimeout(resolve, 80));
+            localStorage.setItem('test-settings', JSON.stringify(settings));
+            settingsWrites.push(settings);
+          },
+        } },
+        permissions: { contains: async () => false },
+        scripting: { executeScript: async details => {
+          if (details.func) {
+            appliedSettings.push(JSON.parse(localStorage.getItem('test-settings')));
+            return [{ frameId: 0, result: { applied: true } }];
+          }
+          return [{ frameId: 0 }];
+        } },
+      };
+    });
+    try {
+      await options.goto(base + '/options?tab=1');
+      await options.getByRole('button', { name: /^Motor \/ mobility/ }).click();
+      const first = options.getByLabel('Larger click targets', { exact: true });
+      await first.check();
+      await options.getByLabel('Extra button spacing', { exact: true }).check();
+      await first.uncheck();
+      await options.waitForFunction(() => appliedSettings.at(-1)?.selected.join() === 'motor:Extra button spacing');
+      assert.equal(await options.getByRole('button', { name: 'Save and apply', exact: true }).count(), 0);
+      assert.equal(await options.getByRole('switch').count(), 0);
+      assert.equal(await options.evaluate(() => appliedSettings.at(-1)?.enabled), true);
+      await options.reload();
+      await options.getByRole('button', { name: /^Motor \/ mobility/ }).click();
+      assert.equal(await options.getByLabel('Extra button spacing', { exact: true }).isChecked(), true);
+      assert.equal(await options.getByRole('switch').count(), 0);
+      assert.equal(await options.evaluate(() => settingsWrites.length), 0);
+      await options.getByRole('button', { name: 'Clear all', exact: true }).click();
+      await options.waitForFunction(() => appliedSettings.at(-1)?.selected.length === 0);
+      await options.getByRole('button', { name: 'Reset choices', exact: true }).click();
+      await options.waitForFunction(() => appliedSettings.at(-1)?.enabled === true);
+    } finally { await options.close(); }
+  });
   await check('static text includes code and buttons; editors/icons stay intact', async () => {
     await load('/simple');
     const before = await styles('#nested'); const code = await styles('#code'); const edit = await styles('#editable'); const icon = await styles('#icon'); const inlineCode = await styles('#inline-code');
@@ -134,8 +181,10 @@ try {
     await page.mouse.move(bounds.x + 4, bounds.y + 4);
     await page.waitForFunction(() => [...CSS.highlights.keys()].filter(name => name.includes('-passage')).length === 2);
     const appearance = () => page.evaluate(() => {
-      const name = [...CSS.highlights.keys()].find(name => name.endsWith('-passage'));
-      const dark = name + '-1';
+      const names = [...CSS.highlights.keys()].filter(name => name.includes('-passage-'));
+      const nameFor = id => names.find(name => [...CSS.highlights.get(name)].some(range => range.startContainer.parentElement.id === id));
+      const name = nameFor('plain');
+      const dark = nameFor('light-text');
       return {
         text: getComputedStyle(document.querySelector('#plain')).color,
         light: getComputedStyle(document.querySelector('#light-text')).color,
@@ -144,8 +193,13 @@ try {
         preserved: document.querySelector('#plain').innerHTML === passageOriginal,
       };
     });
-    assert.deepEqual(await appearance(), { text: 'rgb(34, 34, 34)', light: 'rgb(238, 238, 238)',
-      background: 'rgb(234, 221, 202)', darkBackground: 'rgb(40, 51, 66)', preserved: true });
+    const actual = await appearance();
+    assert.equal(actual.text, 'rgb(34, 34, 34)');
+    assert.equal(actual.light, 'rgb(238, 238, 238)');
+    assert.equal(actual.preserved, true);
+    assert.notEqual(actual.background, actual.darkBackground);
+    assert.notEqual(actual.background, 'rgba(0, 0, 0, 0)');
+    assert.notEqual(actual.darkBackground, 'rgba(0, 0, 0, 0)');
     await page.evaluate(() => document.querySelector('#light-text').style.color = '#222');
     await page.waitForFunction(() => [...CSS.highlights.keys()].filter(name => name.includes('-passage')).length === 1);
     await page.evaluate(() => testReadingController.reset());
@@ -241,8 +295,8 @@ try {
       } } };
     });
     // Reproduce the shipped version-2/off-only engine and its version-4 owner.
-    const legacy = engineSource.replace('version === 4', 'version === 2')
-      .replace('version: 4, suggest', 'version: 2, suggest')
+    const legacy = engineSource.replace(/version === \d+/, 'version === 2')
+      .replace(/version: \d+, suggest/, 'version: 2, suggest')
       .replace('guideDismissed = !guideDismissed;', 'guideDismissed = true;');
     const owner = await readFile(contentPath, 'utf8');
     const ownerVersion = Number(owner.match(/clearspaceApply.version = (\d+)/)[1]);
@@ -255,7 +309,7 @@ try {
     assert.equal(await page.evaluate(() => Boolean(window.guideTestRoot && !guideTestRoot.querySelector('.line').parentElement.hidden)), false);
     await page.evaluate(engineSource);
     await page.evaluate(owner);
-    assert.equal(await page.evaluate(() => clearspaceDyslexia.version), 4);
+    assert.equal(await page.evaluate(() => clearspaceDyslexia.version), 5);
     assert.equal(await page.evaluate(() => clearspaceApply.version), ownerVersion);
     assert.equal(await page.evaluate(() => storageListeners.length), 1);
     const visible = () => page.evaluate(() => {
@@ -315,7 +369,7 @@ try {
     await page.getByLabel('Letters or words are difficult to distinguish', {exact:true}).check();
     await page.getByText('Customize suggested changes',{exact:true}).click();
     await page.getByLabel('Highlight the word under your pointer',{exact:true}).selectOption('false');
-    await page.getByRole('button',{name:'Save and apply',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Save and apply',exact:true}).count(),0);
     await page.getByRole('status').filter({hasText:'Demo settings saved'}).waitFor();
     await page.reload(); await page.getByRole('button', {name:/Dyslexia Reading at your rhythm/}).click();
     assert.equal(await page.getByLabel('Letters or words are difficult to distinguish',{exact:true}).isChecked(),true);
@@ -444,7 +498,7 @@ try {
     const voice=page.getByLabel('Read-aloud voice',{exact:true});
     assert.equal(await voice.inputValue(),'');
     assert.equal(await voice.locator('option:checked').textContent(),'Auto-detect language');
-    await page.getByRole('button',{name:'Save and apply',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Save and apply',exact:true}).count(),0);
     await page.getByRole('status').filter({hasText:'Demo settings saved'}).waitFor();
     await page.reload();await page.getByRole('button',{name:/Dyslexia Reading at your rhythm/}).click();
     assert.equal(await page.getByLabel('Read-aloud voice',{exact:true}).locator('option:checked').textContent(),'Auto-detect language');

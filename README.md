@@ -32,7 +32,7 @@ After code changes, rebuild, click Reload on the extension card, refresh webpage
 
 ### Combined live preview
 
-**Preview all adjustments** shows all current choices together on an interactive sample webpage, before saving. It uses the same page adjustment scripts for vision, dyslexia, motor controls, motion and distraction hiding. Try buttons, links, keyboard focus, text selection and pointer reading tools inside the preview. Listening uses the browser's available speech voices. Draft changes stay inside the preview; **Save and apply** updates connected websites. Pause, Clear all and Reset choices also update the preview.
+**Preview all adjustments** shows all current choices together on an interactive sample webpage. It uses the same page adjustment scripts for vision, dyslexia, motor controls, motion and distraction hiding. Try buttons, links, keyboard focus, text selection and pointer reading tools inside the preview. Listening uses the browser's available speech voices. Choices save and apply to connected websites automatically. **Before adjustments** shows the original sample without changing your saved choices or connected websites. Clear all and Reset choices also update the preview.
 
 Run `npm run build` and `node tests/preview.browser.mjs` for the Chrome integration check. Set `A11YFIX_PLAYWRIGHT` to a local playwright-core `index.mjs` and `A11YFIX_CHROME` to your Chrome executable when needed.
 

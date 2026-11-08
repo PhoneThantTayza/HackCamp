@@ -3,6 +3,7 @@ import { defaults, focusMode, colorVision, lowVision, lowVisionOptions, lightSen
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
 import CombinedPreview from "./CombinedPreview.jsx";
+import DyslexiaSlider from './DyslexiaSlider.jsx';
 
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
@@ -52,7 +53,7 @@ function ColourVisionControls({ value, onChange, enabled }) {
       <p className="colour-label">Live colour sample{!enabled && " · adjustments paused"}</p>
       {[false, true].map(adjusted => <div key={String(adjusted)} className="colour-sample-row"><span className="muted">{adjusted ? "Your settings" : "Original"}</span><div className="colour-swatches" style={{ filter: adjusted && filtered ? "url(#clearspace-sample-colour)" : "none" }}>{samples.map(([colour, name, shape]) => <div key={name} className="colour-swatch"><span style={{ backgroundColor: colour }} aria-hidden="true">{shape}</span><small>{name}</small></div>)}</div></div>)}
     </div>
-    <p id="colour-limit" className="muted control-caption">Colour remapping affects the whole page, including images. Results vary; this is assistance, not a simulation or a correction. The sample updates now; save to apply to your webpage.</p>
+    <p id="colour-limit" className="muted control-caption">Colour remapping affects the whole page, including images. Results vary; this is assistance, not a simulation or a correction. Changes save and apply to connected webpages automatically.</p>
     </>}
     </div>
   </div>;
@@ -99,7 +100,7 @@ function LowVisionControls({ selected, onToggle, enabled, strengths, onStrengthC
   return <div className="low-vision-controls">
     <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls="low-vision-options" onClick={() => setOpen(!open)}><span>Low vision</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
     <div id="low-vision-options" hidden={!open}>
-      <p className="muted control-description">Choose what makes webpages easier to see. Save to apply across websites with site access.</p>
+      <p className="muted control-description">Choose what makes webpages easier to see. Changes apply automatically across websites with site access.</p>
       {lowVisionOptions.map((option, index) => <div key={option} className="low-vision-option">
         <label className="option-row"><input type="checkbox" checked={selected.includes(`vision:${option}`)} onChange={() => onToggle(`vision:${option}`)} /><span>{option}<small className="muted block">{descriptions[index]}</small></span></label>
         {selected.includes(`vision:${option}`) && <>
@@ -108,7 +109,7 @@ function LowVisionControls({ selected, onToggle, enabled, strengths, onStrengthC
         <LowVisionSample strength={strengths[option]} kind={["size", "contrast", "links", "focus"][index]} active={selected.includes(`vision:${option}`)} enabled={enabled} />
         </>}
       </div>)}
-      <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
+      <p className="muted control-caption">Your choices save and apply to connected webpages automatically.</p>
     </div>
   </div>;
 }
@@ -154,7 +155,7 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
         <LightSensitivitySample option={option} strengths={strengths} enabled={enabled} />
         </>}
       </div>)}
-      <p className="muted control-caption">Samples update now; save to apply to your webpage. Dim page adjusts webpage content, not your screen brightness. Website styling can affect results.</p>
+      <p className="muted control-caption">Changes save and apply to connected webpages automatically. Dim page adjusts webpage content, not your screen brightness. Website styling can affect results.</p>
     </div>
   </div>;
 }
@@ -173,11 +174,32 @@ function FocusModeControls({ value, onChange, enabled }) {
       <button type="button">Sample control</button>
       {enabled && <div className="focus-sample-shade" aria-hidden="true" style={{ background: focusMode.background(value, center) }} />}
     </div>
-    <p className="muted control-caption">Sample updates now; save to apply to your webpage. At 0% dimming, the page stays unchanged.</p>
+    <p className="muted control-caption">Changes save and apply to connected webpages automatically. At 0% dimming, the page stays unchanged.</p>
   </div>;
 }
 
-function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
+function DyslexiaLabel({ id, label, value, active, interacting }) {
+  const host = useRef(null);
+  useEffect(() => {
+    const root = host.current.shadowRoot ?? host.current.attachShadow({ mode: 'open' });
+    const text = document.createElement('p');
+    text.style.margin = '0';
+    text.textContent = label;
+    root.append(text);
+    const controller = globalThis.clearspaceDyslexia.createController(root);
+    if (active) controller.apply({
+      experiences: { [id]: true },
+      // Avoid the engine's document-wide contrast scan in a local preview.
+      customization: { ...value.customization, allTextContrast: false,
+        ...(!interacting ? { guide: false, wordHighlight: false, focusParagraph: false } : {}) },
+    });
+    return () => { controller.reset(); text.remove(); };
+  }, [id, label, active, interacting, value.customization]);
+  return <span ref={host} className="dyslexia-live-label" />;
+}
+
+function DyslexiaControls({ value, onChange, enabled, speechReset, query, mutualOnly = false, prefix = 'dyslexia' }) {
+  const [previewChoice, setPreviewChoice] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
   const [expandedChoices, setExpandedChoices] = useState(() => ({ ...value.experiences }));
   const custom = value.customization;
@@ -192,7 +214,7 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
       ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Word explanations coming later.', true],
     ], note: 'Summaries and simpler language coming later.' },
     { title: 'Reading focus & tracking', choices: [
-      ['losePlace', 'I lose my place while reading', 'Pointer-following guide over text and controls. Right-click toggles.'],
+      ['losePlace', 'Focus mode', 'Shared by Dyslexia and Cognitive. A colored reading band follows your pointer. Right-click toggles.'],
     ] },
     { title: 'Reading pace & listening', choices: [
       ['preferListening', 'I prefer listening to text', 'Highlight text to hear it read aloud. Escape stops.'],
@@ -219,10 +241,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
     distinguishWords: ['font', 'letterSpacing', 'wordSpacing', 'wordHighlight', 'allTextContrast'],
     readingFatigue: ['focusParagraph', 'dimming'],
     overwhelmingParagraphs: ['lineHeight', 'lineLength', 'paragraphSpacing', 'alignStart'],
-    losePlace: ['guide', 'guideSize', 'guideColor'],
+    losePlace: ['guideSize', 'dimming', 'guideColor'],
   };
 
-  const filtered = sections.map(section => ({ ...section, choices: section.choices.filter(choice =>
+  const filtered = sections.filter(section => !mutualOnly || section.choices.some(([id]) => id === 'losePlace')).map(section => ({ ...section, choices: section.choices.filter(choice =>
     `${section.title} ${choice[1]} ${choice[2]}`.toLowerCase().includes(query.toLowerCase())) })).filter(section => section.choices.length);
 
   return <div className="dyslexia-controls">
@@ -231,27 +253,32 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
         <button type="button" className="clear-button" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Clear custom overrides</button>
       </div>}
       {filtered.map(section => {
-        const sectionId = `dyslexia-section-${section.choices[0][0]}`;
-        const expanded = Boolean(expandedSections[section.title] || query);
+        const sectionId = `${prefix}-section-${section.choices[0][0]}`;
+        const expanded = Boolean(mutualOnly || expandedSections[section.title] || query);
         return <section className="dyslexia-section" key={section.title}>
-        <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={expanded} aria-controls={sectionId}
+        {!mutualOnly && <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={expanded} aria-controls={sectionId}
           onClick={() => setExpandedSections(current => ({ ...current, [section.title]: !expanded }))}>
           <span>{section.title}</span><span className={`chevron ${expanded ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
-        </button></h3>
+        </button></h3>}
         <div id={sectionId} hidden={!expanded}>
         {section.choices.map(([id, label, help, unavailable]) => <details key={id} className="dyslexia-choice" open={expandedChoices[id] === true}
           onToggle={event => { const expanded = event.currentTarget.open; setExpandedChoices(current => current[id] === expanded ? current : { ...current, [id]: expanded }); }}>
-          <summary className="dyslexia-choice-summary">
-            <label className="option-row" htmlFor={`dyslexia-${id}`}>
-              <input id={`dyslexia-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
+          <summary className="dyslexia-choice-summary"
+            onPointerEnter={() => setPreviewChoice(id)} onPointerLeave={() => setPreviewChoice(null)}
+            onFocusCapture={() => setPreviewChoice(id)}
+            onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPreviewChoice(null); }}>
+            <label className="option-row" htmlFor={`${prefix}-${id}`}>
+              <input id={`${prefix}-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
                 onChange={event => {
                   const checked = event.target.checked;
                   setExpandedChoices(current => ({ ...current, [id]: checked }));
                   onChange({ ...value, enabled: true, experiences: { ...value.experiences, [id]: checked } });
                 }} />
-              <span>{label}<small className="muted block">{help}</small></span>
+              <span className="dyslexia-label-copy"><DyslexiaLabel id={id} label={label} value={value}
+                interacting={previewChoice === id}
+                active={!unavailable && (previewChoice === id || value.experiences[id] === true)} />
+                <small className="muted block">{help}</small></span>
             </label>
-            <span className={`chevron ${expandedChoices[id] ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
           </summary>
           <div className="dyslexia-choice-content">
             {fieldsByChoice[id] && <div className="dyslexia-customization">
@@ -260,12 +287,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
             <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
           </select>
         </label>}
-        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
-          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
-            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
-            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
-        </label>)}
-        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
+        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(field => <DyslexiaSlider key={field[0]}
+          field={field} custom={custom} onChange={customize}
+          suggested={globalThis.clearspaceDyslexia.suggest({ ...value, experiences: { ...value.experiences, [id]: true } })} />)}
+        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['alignStart', 'Align to reading direction']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
           <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
             <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
           </select>
@@ -285,7 +310,7 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
         </div>
       </section>; })}
       {!filtered.length && <p className="muted text-xs">No matching experiences.</p>}
-      <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
+      <p className="muted dyslexia-help mt-3">Changes save and apply to connected webpages automatically.</p>
   </div>;
 }
 
@@ -293,8 +318,8 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
   const [open, setOpen] = useState(group.id === "vision");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const count = group.options.filter(option => selected.includes(`${group.id}:${option}`)).length + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
-  const options = group.options.filter(option => option.toLowerCase().includes(query.toLowerCase()));
+  const count = group.options.filter(option => option !== 'Focus mode' && selected.includes(`${group.id}:${option}`)).length + (group.id === 'cognitive' ? Number(dyslexia.experiences.losePlace === true) : 0) + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
+  const options = group.options.filter(option => option !== 'Focus mode' && option.toLowerCase().includes(query.toLowerCase()));
   const showColour = group.id === "vision" && "colour color blindness protan deutan tritan red green blue yellow strength cues".includes(query.toLowerCase());
   const showLowVision = group.id === "vision" && `low vision strength ${lowVisionOptions.join(" ")}`.toLowerCase().includes(query.toLowerCase());
   const showLight = group.id === "vision" && `light sensitivity brightness dim page soften bright backgrounds warm colour color tint dark page theme strength`.includes(query.toLowerCase());
@@ -312,13 +337,14 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
     {open && <div id={`${group.id}-options`} className="options-list">
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
       {options.map(option => <React.Fragment key={option}>
-        <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off and save to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
+        <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
         {group.id === "cognitive" && option === "Focus mode" && selected.includes("cognitive:Focus mode") && <FocusModeControls value={focusSettings} onChange={onFocusChange} enabled={enabled} />}
       </React.Fragment>)}
       {!options.length && !showColour && !showLowVision && !showLight && group.id !== "dyslexia" && <p className="muted text-xs py-2">No matching adjustments.</p>}
       {showColour && <ColourVisionControls value={colour} onChange={onColourChange} enabled={enabled} />}
       {showLight && <LightSensitivityControls selected={selected} onToggle={onToggle} enabled={enabled} strengths={lightStrengths} onStrengthChange={onLightChange} />}
       {showLowVision && <LowVisionControls strengths={lowVisionStrengths} onStrengthChange={onLowVisionChange} selected={selected} onToggle={onToggle} enabled={enabled} />}
+      {group.id === "cognitive" && <DyslexiaControls mutualOnly prefix="cognitive" value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} query={query} />}
       {group.id === "dyslexia" && <DyslexiaControls value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} speechReset={speechReset} query={query} />}
     </div>}
   </section>;
@@ -328,38 +354,54 @@ export default function App() {
   const [light, setLight] = useState(false);
   const [selected, setSelected] = useState([]);
   const [dyslexia, setDyslexia] = useState(emptyDyslexia);
-  const [enabled, setEnabled] = useState(true);
+  const enabled = true;
   const [colour, setColour] = useState(defaults.colorVision);
   const [lowVisionStrengths, setLowVisionStrengths] = useState(defaults.lowVision);
   const [focusSettings, setFocusSettings] = useState(defaults.focusMode);
   const [lightStrengths, setLightStrengths] = useState(defaults.lightSensitivity);
   const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const saveQueue = useRef(Promise.resolve());
+  const lastSettings = useRef(null);
+  const saveRevision = useRef(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [speechReset, setSpeechReset] = useState(0);
   useEffect(() => { loadSettings().then(settings => {
-    setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
+    setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
-  function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeDyslexia(value) { setDyslexia(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeColour(value) { setColour(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeLowVision(value) { setLowVisionStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeLight(value) { setLightStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeFocus(value) { setFocusSettings(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function clearChoices() { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setStatus("Unsaved changes. Select Save and apply."); }
+  useEffect(() => {
+    if (!ready) return;
+    const settings = { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia };
+    const snapshot = JSON.stringify(settings);
+    // Loading saved preferences must not overwrite them or trigger a new save.
+    if (lastSettings.current === null) { lastSettings.current = snapshot; return; }
+    if (lastSettings.current === snapshot) return;
+    lastSettings.current = snapshot;
+    const revision = ++saveRevision.current;
+    setError("");
+    setStatus("Saving and applying…");
+    // Serialize writes and page updates; skip queued choices superseded by a newer edit.
+    saveQueue.current = saveQueue.current.then(async () => {
+      if (revision !== saveRevision.current) return;
+      try {
+        await saveSettings(settings);
+        const message = await applyToTarget();
+        if (revision === saveRevision.current) setStatus(message);
+      } catch (error) {
+        if (revision === saveRevision.current) { setStatus(""); setError(error.message); }
+      }
+    });
+  }, [ready, enabled, selected, light, colour, lowVisionStrengths, lightStrengths, focusSettings, dyslexia]);
+  function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); }
+  function changeDyslexia(value) { const customization = { ...value.customization }; delete customization.guide; setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode')); }
+  function changeColour(value) { setColour(value); }
+  function changeLowVision(value) { setLowVisionStrengths(value); }
+  function changeLight(value) { setLightStrengths(value); }
+  function changeFocus(value) { setFocusSettings(value); }
+  function clearChoices() { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); }
+  function resetChoices() { clearChoices(); setSpeechReset(value => value + 1); }
   const choiceCount = selected.length + Number(colour.mode !== "off") + Number(colour.cues) + dyslexiaChoiceCount(dyslexia);
 
-  async function persist(reset = false) {
-    if (reset) setSpeechReset(value => value + 1);
-    setBusy(true); setError(""); setStatus("");
-    try {
-      await saveSettings(reset ? { ...defaults, light, dyslexia: emptyDyslexia() } : { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia });
-      if (reset) { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setEnabled(true); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); }
-      setStatus(await applyToTarget());
-    } catch (error) { setError(error.message); }
-    finally { setBusy(false); }
-  }
   async function allowAutomatic() {
     setError("");
     try {
@@ -370,7 +412,7 @@ export default function App() {
   return <div className={`app ${light ? "light" : ""}`}>
     <header className="site-header flex items-center justify-between gap-4">
       <a href="#" className="brand flex items-center gap-2.5" aria-label="Clearspace home"><span className="brand-mark"><Icon name="spark" size={21} /></span>clearspace<span className="prototype-tag">BETA</span></a>
-      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that works for you.</span><button className="icon-button" disabled={!ready || busy} onClick={() => { setLight(!light); setStatus("Theme changed. Select Save and apply to remember it."); }} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
+      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that works for you.</span><button className="icon-button" disabled={!ready} onClick={() => setLight(current => !current)} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
     </header>
 
     <main className="main-content w-full mx-auto">
@@ -385,37 +427,27 @@ export default function App() {
       <section className="accessibility-section" aria-labelledby="adjustments-title">
         <div className="flex items-center justify-between gap-3 mb-2"><h2 id="adjustments-title" className="text-sm font-medium">What would make browsing easier?</h2><span className="optional-tag">OPTIONAL</span></div>
         <p className="muted text-sm">Choose what works for you. You can mix and match.</p>
-        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} focusSettings={focusSettings} onFocusChange={changeFocus} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
-        <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{choiceCount ? `${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{choiceCount > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={clearChoices}>Clear all</button>}</div>
+        <fieldset disabled={!ready} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} focusSettings={focusSettings} onFocusChange={changeFocus} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
+        {choiceCount > 0 && <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{`${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.`}</span><button type="button" className="clear-button shrink-0" disabled={!ready} onClick={clearChoices}>Clear all</button></div>}
 
       </section>
 
       {ready && <CombinedPreview settings={{ version: 1, enabled, selected, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia }} />}
 
-      <section className="extension-controls" aria-label="Extension controls">
+      <section className="extension-controls" aria-label="Browsing controls">
         {!isExtension && <p className="optional-tag mb-4">LOCAL UI DEMO — does not adjust websites</p>}
         <div className="browsing-controls">
-          <div className="controls-heading">
-            <div><h2 className="text-base font-medium">Your browsing preferences</h2><p id="adjustments-help" className="muted control-description">Choose adjustments below, then save to use them on your page.</p></div>
-            <label className="adjustments-switch">
-              <input type="checkbox" role="switch" aria-label="Enable webpage adjustments" aria-describedby="adjustments-help adjustments-off-help" checked={enabled} disabled={!ready || busy} onChange={event => { setEnabled(event.target.checked); setStatus("Unsaved changes. Select Save and apply."); }} />
-              <span className="switch-track" aria-hidden="true"><span /></span>
-              <span className="switch-label">{enabled ? "On" : "Off"}</span>
-            </label>
-          </div>
-          <p id="adjustments-off-help" className="muted control-description">Switch off and save to pause adjustments. Your choices stay remembered.</p>
           <div className="controls-actions">
-            <button type="button" className="preview-button controls-save" disabled={!ready || busy} onClick={() => persist()}>{busy ? "Saving…" : "Save and apply"}<Icon name="arrow" size={16} /></button>
-            <button type="button" className="secondary-button" aria-describedby="reset-help" disabled={!ready || busy} onClick={() => persist(true)}>Reset choices</button>
+            <div className="reset-copy"><h3 className="text-sm font-medium">Reset your preferences</h3><p className="muted control-description">Clear your choices and restore the default settings.</p></div>
+            <button type="button" className="secondary-button" disabled={!ready} onClick={resetChoices}>Reset choices</button>
           </div>
-          <p id="reset-help" className="muted control-caption">Reset clears your selections and removes their effects.</p>
           {isExtension && <div className="automatic-access">
             <span className="automatic-icon"><Icon name="spark" size={20} /></span>
-            <div className="automatic-copy"><h3 className="text-sm font-medium">Take your preferences with you</h3><p className="muted control-description">Allow site access to use saved adjustments automatically as you browse.</p></div>
-            <button type="button" className="secondary-button" disabled={!ready || busy} onClick={allowAutomatic}>Allow site access<Icon name="arrow" size={15} /></button>
+            <div className="automatic-copy"><h3 className="text-sm font-medium">Apply automatically as you browse</h3><p className="muted control-description">Allow site access to apply your saved adjustments to existing and newly opened websites. This is optional.</p></div>
+            <button type="button" className="secondary-button" disabled={!ready} onClick={allowAutomatic}>Allow site access<Icon name="arrow" size={15} /></button>
           </div>}
+          {isExtension && <details className="controls-help muted"><summary>How does site access work?</summary><p>To adjust one website, open it and click the Clearspace toolbar icon. To apply your choices automatically across websites, select Allow site access and accept Chrome's permission prompt. Chrome settings and other protected pages cannot be adjusted. You can review or revoke access in Chrome's Extensions → Clearspace → Details → Site access. Refresh adjusted pages after revoking access to remove any remaining effects.</p></details>}
         </div>
-        <details className="controls-help muted"><summary>How does site access work?</summary><p>Without automatic access, open a webpage and click the Clearspace extension icon first. Automatic access is optional and also covers new webpages. Browser settings pages and some protected pages cannot be adjusted. Manage site access in Chrome's extension Details page.</p></details>
         <p role="status" className={status ? "controls-feedback text-sm" : ""}>{status}</p>
         {error && <p role="alert" className="controls-feedback text-sm">{error}</p>}
       </section>
