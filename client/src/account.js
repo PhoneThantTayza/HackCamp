@@ -8,7 +8,8 @@ import { isExtension, isFirefox, extensionApi } from "./settings.js";
 const DOMAIN = "dev-tsmyxcbitdn1q1vy.us.auth0.com";
 const CLIENT_ID = "lXZhBKJAB3KVeANrjy2G1nfcl6Lp0ts4";
 const AUDIENCE = "https://accessify-api";
-export const API = "http://127.0.0.1:3000";
+// Set VITE_API_URL in the root .env.local before building for deployment.
+export const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
 
 const base64url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const random = size => base64url(crypto.getRandomValues(new Uint8Array(size)));
@@ -85,7 +86,7 @@ async function api(method, body) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error(`Can't reach the server at ${API}. Is "npm run dev" running?`);
+    throw new Error(`Can't reach the sync server at ${API}. Check your internet connection and that the server is running.`);
   }
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) { await signOut(); throw new Error("Please sign in again."); }

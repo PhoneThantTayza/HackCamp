@@ -70,5 +70,8 @@ $RECYCLE.BIN/
 AGENTS.md
 CLAUDE.md
 INSTRUCTIONS.md
+<<<<<<< HEAD
+=======
 # Clearspace account sync data (people's saved settings)
 server/data/
+>>>>>>> ea34cc00c5b3cd3b21a52c0dac436df19c44da5b
