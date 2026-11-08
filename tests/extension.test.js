@@ -62,10 +62,11 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
   const registrations = [];
   const injections = [];
   const noop = { addListener() {} };
-  const context = vm.createContext({ importScripts(file) { assert.equal(file, "selection-tts.js"); }, chrome: {
+  const context = vm.createContext({ importScripts(file) { assert.ok(["selection-tts.js", "word-lookup-background.js"].includes(file)); }, chrome: {
     action: { onClicked: noop }, runtime: { onInstalled: noop, onStartup: noop },
     permissions: { contains: async () => true, onAdded: noop, onRemoved: noop },
-    tabs: { query: async () => [{ id: 7 }] },
+    tabs: { query: async () => [{ id: 7 }], onUpdated: noop },
+    storage: { onChanged: noop },
     scripting: {
       getRegisteredContentScripts: async () => [],
       registerContentScripts: async scripts => registrations.push(...scripts),
@@ -74,7 +75,7 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
   } });
   vm.runInContext(readFileSync("client/public/background.js", "utf8"), context);
   await vm.runInContext("syncAutomaticAccess()", context);
-  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"];
+  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"];
 
   assert.deepEqual(Array.from(registrations.find(script => script.id === "clearspace-auto").js), core);
   assert.deepEqual(Array.from(injections.find(script => script.files.includes("content.js")).files), core);
@@ -161,7 +162,7 @@ test("page styles update without duplication and disable removes only our sheet"
 
 test("build contains the files referenced by the manifest", () => {
   const manifest = JSON.parse(readFileSync("dist/manifest.json", "utf8"));
-  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "selection-tts.js", "content.js"]) {
+  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "selection-tts.js", "word-lookup.js", "word-lookup-background.js", "content.js"]) {
 
     assert.ok(readFileSync(`dist/${file}`).length);
   }
@@ -337,7 +338,7 @@ test("colour palettes preserve neutral colours and opacity; zero strength is ide
   const identity = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0";
   for (const mode of ["protan", "deutan", "tritan"]) {
     assert.equal(matrix({ mode, strength: 0 }), identity);
-    const values = matrix({ mode, strength: 100 }).split(" ").map(Number);
+    const values = matrix({ mode, strength: 200 }).split(" ").map(Number);
     assert.equal(values.length, 20);
     for (let row = 0; row < 3; row++) {
       assert.ok(Math.abs(values.slice(row * 5, row * 5 + 3).reduce((a, b) => a + b) - 1) < 1e-10);
@@ -346,11 +347,13 @@ test("colour palettes preserve neutral colours and opacity; zero strength is ide
     }
     assert.deepEqual(values.slice(15), [0, 0, 0, 1, 0]);
     assert.notEqual(matrix({ mode, strength: 100 }), identity);
+    assert.notEqual(matrix({ mode, strength: 200 }), matrix({ mode, strength: 100 }));
   }
   assert.equal(matrix({ mode: "unexpected", strength: 100 }), identity);
   assert.equal(normalize({ mode: "constructor", strength: -200, cues: "true" }).mode, "off");
   assert.equal(normalize({ strength: -200 }).strength, 0);
-  assert.equal(normalize({ strength: 200 }).strength, 100);
+  assert.equal(normalize({ strength: 200 }).strength, 200);
+  assert.equal(normalize({ strength: 250 }).strength, 200);
   assert.equal(normalize({ strength: NaN }).strength, 70);
   assert.equal(normalize().cues, false);
   assert.equal(normalize({ cues: "true" }).cues, false);
@@ -420,12 +423,12 @@ test("Save connects open websites with automatic access and requires a page ackn
   // Only content.js injections; motion, click-target, spacing and focus add-ons are injected separately.
   const pageInjections = injected.filter(item => item.files?.includes("content.js"));
   assert.deepEqual(pageInjections.map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"]);
+  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"]);
 
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
   automatic = false;
-  await assert.rejects(applyToTarget(), /no website is connected/);
+  assert.match(await applyToTarget(), /applied to 1 website tab/, 'Already granted tabs update without requiring full automatic access');
   globalThis.location.search = "?tab=7";
   assert.match(await applyToTarget(), /applied to 1 website tab/);
   acknowledge = false;

@@ -9,7 +9,7 @@ const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
   { id: "dyslexia", name: "Dyslexia", icon: "type", description: "Reading at your rhythm.", options: [] },
   { id: "motor", name: "Motor / mobility", icon: "hand", description: "More room to navigate.", options: ["Larger click targets", "Extra button spacing", "Keyboard focus indicators", "Reduce motion"] },
-  { id: "cognitive", name: "Cognitive", icon: "spark", description: "Less noise. More focus.", options: ["Focus mode", "Hide distractions"] },
+  { id: "cognitive", name: "Cognitive", icon: "brain", description: "Less noise. More focus.", options: ["Focus mode", "Hide distractions"] },
 ];
 
 function Icon({ name, size = 20, ...props }) {
@@ -18,6 +18,7 @@ function Icon({ name, size = 20, ...props }) {
     sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>,
     moon: <path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10Z" />,
     eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
+    brain: <><path d="M12 5a3 3 0 0 0-6 0v.4a4 4 0 0 0-2 6.6 4 4 0 0 0 2 6.6v.4a3 3 0 0 0 6 0V5Zm0 0a3 3 0 0 1 6 0v.4a4 4 0 0 1 2 6.6 4 4 0 0 1-2 6.6v.4a3 3 0 0 1-6 0" /><g className="brain-folds"><path d="M6 5c0 2 1 3 3 3m-5 4h3c2 0 2 3 0 3m-1 4c0-2 1-3 3-3m9-11c0 2-1 3-3 3m5 4h-3c-2 0-2 3 0 3m1 4c0-2-1-3-3-3" /></g></>,
     type: <><path d="M4 19 10 5l6 14M6 15h8m2-5h6m-3 0v9" /></>,
     hand: <><path d="M8 13V6a2 2 0 0 1 4 0v6-8a2 2 0 0 1 4 0v8-5a2 2 0 0 1 4 0v8c0 5-3 7-7 7-3 0-5-2-7-5l-3-4a2 2 0 0 1 3-2l2 2Z" /></>,
     spark: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" /></>,
@@ -26,7 +27,7 @@ function Icon({ name, size = 20, ...props }) {
     chevron: <path d="m8 10 4 4 4-4" />,
     github: <><path d="M9 19c-5 1-5-2-7-2m14 5v-4c0-1-.4-2-1-2 4-.5 6-2 6-6 0-1-.5-3-1.5-4 .5-1 .5-2 0-3-2 0-3 1-4 1a13 13 0 0 0-7 0C7 3 6 2 4 3c-.5 1-.5 2 0 3-1 1-1.5 3-1.5 4 0 4 2 5.5 6 6-.6.5-1 1-1 2v4" /></>,
   };
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name]}</svg>;
+  return <svg data-icon={name} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name]}</svg>;
 }
 
 function ColourVisionControls({ value, onChange, enabled }) {
@@ -46,7 +47,7 @@ function ColourVisionControls({ value, onChange, enabled }) {
     </select>
     {value.mode !== "off" && <>
     <div className="colour-strength"><label htmlFor="colour-strength">Strength</label><output htmlFor="colour-strength">{value.strength}%</output></div>
-    <input id="colour-strength" className="colour-range" type="range" min="0" max="100" step="5" value={value.strength} disabled={value.mode === "off"} onChange={event => onChange({ ...value, strength: Number(event.target.value) })} />
+    <input id="colour-strength" className="colour-range" type="range" min="0" max="200" step="5" value={value.strength} disabled={value.mode === "off"} onChange={event => onChange({ ...value, strength: Number(event.target.value) })} />
     <label className="option-row"><input type="checkbox" checked={value.cues} onChange={event => onChange({ ...value, cues: event.target.checked })} /><span>Use cues beyond colour<small className="muted block">Underline links, outline controls and mark invalid fields with dashed outlines.</small></span></label>
     <div className="colour-preview">
       <svg width="0" height="0" aria-hidden="true" className="colour-filter-defs"><defs><filter id="clearspace-sample-colour" colorInterpolationFilters="sRGB"><feColorMatrix type="matrix" values={colorVision.matrix(value)} /></filter></defs></svg>
@@ -135,6 +136,12 @@ function LightSensitivitySample({ option, strengths, enabled }) {
 function LightSensitivityControls({ selected, onToggle, enabled, strengths, onStrengthChange }) {
   const [open, setOpen] = useState(false);
   const active = lightSensitivityOptions.filter(option => selected.includes(`vision:${option}`));
+  const titles = [
+    'Webpages feel too bright',
+    'Bright backgrounds are uncomfortable',
+    'Cool or harsh colours bother my eyes',
+    'Light backgrounds make reading difficult',
+  ];
   const descriptions = [
     "Lower the brightness of the webpage, including images and videos.",
     "Replace bright, nearly white surfaces with softer neutral shades.",
@@ -146,16 +153,16 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
     <div id="light-sensitivity-options" hidden={!open}>
       <p className="muted control-description">Choose a comfortable level of light and warmth for your webpages.</p>
       {lightSensitivityOptions.map((option, index) => <div key={option} className="low-vision-option">
-        <label className="option-row"><input type="checkbox" checked={active.includes(option)} onChange={() => onToggle(`vision:${option}`)} /><span>{option}<small className="muted block">{descriptions[index]}</small></span></label>
+        <label className="option-row"><input type="checkbox" checked={active.includes(option)} onChange={() => onToggle(`vision:${option}`)} /><span>{titles[index]}<small className="muted block">{descriptions[index]}</small></span></label>
         {active.includes(option) && <>
         {option !== "Dark page theme" && <>
-          <div className="colour-strength"><label htmlFor={`light-strength-${index}`}>Strength<span className="sr-only"> for {option}</span></label><output htmlFor={`light-strength-${index}`}>{strengths[option]}%</output></div>
+          <div className="colour-strength"><label htmlFor={`light-strength-${index}`}>Strength<span className="sr-only"> for {titles[index]}</span></label><output htmlFor={`light-strength-${index}`}>{strengths[option]}%</output></div>
           <input id={`light-strength-${index}`} className="colour-range" type="range" min="0" max="200" step="5" value={strengths[option]} onChange={event => onStrengthChange({ ...strengths, [option]: Number(event.target.value) })} />
         </>}
         <LightSensitivitySample option={option} strengths={strengths} enabled={enabled} />
         </>}
       </div>)}
-      <p className="muted control-caption">Changes save and apply to connected webpages automatically. Dim page adjusts webpage content, not your screen brightness. Website styling can affect results.</p>
+      <p className="muted control-caption">Changes save and apply to connected webpages automatically. Brightness adjustments affect webpage content, not your screen brightness. Website styling can affect results.</p>
     </div>
   </div>;
 }
@@ -211,10 +218,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query, mutual
     ] },
     { title: 'Reading comprehension', choices: [
       ['overwhelmingParagraphs', 'Long paragraphs feel overwhelming', 'Extra paragraph space, shorter lines, more line spacing.'],
-      ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Word explanations coming later.', true],
-    ], note: 'Summaries and simpler language coming later.' },
+      ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Select a word or short phrase to open Google results for its definition and pronunciation. Selected text is sent to Google.'],
+    ] },
     { title: 'Reading focus & tracking', choices: [
-      ['losePlace', 'Focus mode', 'Shared by Dyslexia and Cognitive. A colored reading band follows your pointer. Right-click toggles.'],
+      ['losePlace', 'Hard to stay focused while reading', 'Shared by Dyslexia and Cognitive. A colored reading band follows your pointer. Right-click toggles.'],
     ] },
     { title: 'Reading pace & listening', choices: [
       ['preferListening', 'I prefer listening to text', 'Highlight text to hear it read aloud. Escape stops.'],
@@ -331,10 +338,10 @@ const motorSliders = {
 
 // One slide-down per Motor adjustment, styled like the Vision sections
 const motorSections = [
-  { id: "targets", name: "Larger click targets", turnOn: "Make click targets larger", description: "Choose how big buttons and links should be. Save to apply across websites with site access.", options: ["Larger click targets"] },
-  { id: "spacing", name: "Extra button spacing", turnOn: "Add space between buttons", description: "Choose how much room to leave between buttons and links.", options: ["Extra button spacing"] },
-  { id: "keyboard", name: "Keyboard", turnOn: "Show a stronger focus outline", description: "For browsing with the Tab key instead of a mouse.", options: ["Keyboard focus indicators"] },
-  { id: "motion", name: "Reduce motion", turnOn: "Reduce motion", description: "Stop things moving on their own. Choose how much to calm down.", options: ["Reduce motion"] },
+  { id: "targets", name: "Larger click targets", turnOn: "Small buttons are difficult to click", description: "Choose how big buttons and links should be. Save to apply across websites with site access.", options: ["Larger click targets"] },
+  { id: "spacing", name: "Extra button spacing", turnOn: "Buttons are too close together", description: "Choose how much room to leave between buttons and links.", options: ["Extra button spacing"] },
+  { id: "keyboard", name: "Keyboard", turnOn: "Hard to tell which element is selected", description: "For browsing with the Tab key instead of a mouse.", options: ["Keyboard focus indicators"] },
+  { id: "motion", name: "Reduce motion", turnOn: "Animations and movement are uncomfortable", description: "Stop things moving on their own. Choose how much to calm down.", options: ["Reduce motion"] },
 ];
 
 function MotorSample({ kind, level, enabled }) {
@@ -413,10 +420,10 @@ function AccessibilityCard({ group, motorSettings, onMotorChange, selected, onTo
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const count = group.options.filter(option => option !== 'Focus mode' && selected.includes(`${group.id}:${option}`)).length + (group.id === 'cognitive' ? Number(dyslexia.experiences.losePlace === true) : 0) + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
-  const options = group.options.filter(option => option !== 'Focus mode' && option.toLowerCase().includes(query.toLowerCase()));
+  const options = group.options.filter(option => option !== 'Focus mode' && `${option} ${option === 'Hide distractions' ? 'Too many distractions on the page' : ''} ${group.id === 'motor' ? motorSections.find(section => section.options.includes(option))?.turnOn ?? '' : ''}`.toLowerCase().includes(query.toLowerCase()));
   const showColour = group.id === "vision" && "colour color blindness protan deutan tritan red green blue yellow strength cues".includes(query.toLowerCase());
   const showLowVision = group.id === "vision" && `low vision strength ${lowVisionOptions.join(" ")}`.toLowerCase().includes(query.toLowerCase());
-  const showLight = group.id === "vision" && `light sensitivity brightness dim page soften bright backgrounds warm colour color tint dark page theme strength`.includes(query.toLowerCase());
+  const showLight = group.id === "vision" && `light sensitivity brightness dim page soften bright backgrounds warm colour color tint dark page theme strength webpages feel too bright bright backgrounds are uncomfortable cool or harsh colours bother my eyes light backgrounds make reading difficult`.includes(query.toLowerCase());
   const showDyslexia = group.id === "dyslexia" && `dyslexia reading comfort comprehension focus pace listening distinguish words fatigue overwhelming paragraphs unfamiliar lose place listening font spacing line length paragraph guide dimming highlight color`.includes(query.toLowerCase());
   return <section className={`choice-card ${open ? "is-open" : ""}`}>
     <div className="flex items-start justify-between gap-2">
@@ -432,7 +439,7 @@ function AccessibilityCard({ group, motorSettings, onMotorChange, selected, onTo
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
       {group.id === "motor" && options.length > 0 && <MotorControls options={options} selected={selected} onToggle={onToggle} value={motorSettings} onChange={onMotorChange} enabled={enabled} />}
       {group.id !== "motor" && options.map(option => <React.Fragment key={option}>
-        <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
+        <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option === 'Hide distractions' ? 'Too many distractions on the page' : option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
         {group.id === "cognitive" && option === "Focus mode" && selected.includes("cognitive:Focus mode") && <FocusModeControls value={focusSettings} onChange={onFocusChange} enabled={enabled} />}
       </React.Fragment>)}
       {!options.length && !showColour && !showLowVision && !showLight && group.id !== "dyslexia" && <p className="muted text-xs py-2">No matching adjustments.</p>}
@@ -446,6 +453,7 @@ function AccessibilityCard({ group, motorSettings, onMotorChange, selected, onTo
 }
 
 export default function App() {
+  const sidePanel = new URLSearchParams(location.search).get('panel') === '1';
   const [light, setLight] = useState(false);
   const [selected, setSelected] = useState([]);
   const [dyslexia, setDyslexia] = useState(emptyDyslexia);
@@ -506,19 +514,20 @@ export default function App() {
       setStatus(granted ? "Site access granted. Saved settings will apply automatically on permitted webpages." : "Site access declined. Use the extension icon on individual webpages.");
     } catch (error) { setError(error.message); }
   }
-  return <div className={`app ${light ? "light" : ""}`}>
+  const preview = <CombinedPreview settings={{ version: 1, enabled, selected, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia, motor: motorSettings }} />;
+  return <div className={`app ${light ? "light" : ""} ${sidePanel ? 'side-panel' : ''}`}>
     <header className="site-header flex items-center justify-between gap-4">
-      <a href="#" className="brand flex items-center gap-2.5" aria-label="Clearspace home"><span className="brand-mark"><Icon name="spark" size={21} /></span>clearspace<span className="prototype-tag">BETA</span></a>
-      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that works for you.</span><button className="icon-button" disabled={!ready} onClick={() => setLight(current => !current)} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
+      <a href="#" className="brand flex items-center gap-2.5" aria-label="Accessify home"><span className="brand-mark"><img src="./icons/logo-128.png" width="28" height="28" alt="" /></span>accessify<span className="prototype-tag">BETA</span></a>
+      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that accessible for you.</span>{sidePanel && <a className="icon-button" href="./index.html" target="_blank" rel="noopener noreferrer" aria-label="Open full settings page"><Icon name="arrow" size={18} /></a>}<button className="icon-button" disabled={!ready} onClick={() => setLight(current => !current)} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
     </header>
 
     <main className="main-content w-full mx-auto">
       <section className="welcome text-center" aria-labelledby="welcome-title">
-        <div className="welcome-icon mx-auto"><Icon name="spark" size={29} /></div>
+        <div className="welcome-icon mx-auto"><img src="./icons/logo-128.png" width="48" height="48" alt="" /></div>
         <p className="eyebrow muted">LESS FRICTION. MORE POSSIBILITY.</p>
         <h1 id="welcome-title">The web, on your terms.</h1>
-        <p className="intro muted">Welcome to Clearspace. A little space to make the web feel right for you.</p>
-        {!isExtension && <p className="controls-feedback text-sm">You're viewing the local demo. To adjust websites, run <code>npm run build</code>, open <code>chrome://extensions</code>, enable Developer mode and load this project's <code>dist</code> folder. Then open a website and click the Clearspace toolbar icon.</p>}
+        <p className="intro muted">Welcome to Accessify. A little tool to make the web feel right for you.</p>
+        {!isExtension && <p className="controls-feedback text-sm">You're viewing the local demo. To adjust websites, run <code>npm run build</code>, open <code>chrome://extensions</code>, enable Developer mode and load this project's <code>dist</code> folder. Then open a website and click the Accessify toolbar icon.</p>}
       </section>
 
       <section className="accessibility-section" aria-labelledby="adjustments-title">
@@ -529,7 +538,7 @@ export default function App() {
 
       </section>
 
-      {ready && <CombinedPreview settings={{ version: 1, enabled, selected, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia }} />}
+      {ready && (sidePanel ? <details className="panel-preview"><summary>Try a sample page<span className="muted">Preview your adjustments</span></summary>{preview}</details> : preview)}
 
       <section className="extension-controls" aria-label="Browsing controls">
         {!isExtension && <p className="optional-tag mb-4">LOCAL UI DEMO — does not adjust websites</p>}
@@ -543,7 +552,7 @@ export default function App() {
             <div className="automatic-copy"><h3 className="text-sm font-medium">Apply automatically as you browse</h3><p className="muted control-description">Allow site access to apply your saved adjustments to existing and newly opened websites. This is optional.</p></div>
             <button type="button" className="secondary-button" disabled={!ready} onClick={allowAutomatic}>Allow site access<Icon name="arrow" size={15} /></button>
           </div>}
-          {isExtension && <details className="controls-help muted"><summary>How does site access work?</summary><p>To adjust one website, open it and click the Clearspace toolbar icon. To apply your choices automatically across websites, select Allow site access and accept Chrome's permission prompt. Chrome settings and other protected pages cannot be adjusted. You can review or revoke access in Chrome's Extensions → Clearspace → Details → Site access. Refresh adjusted pages after revoking access to remove any remaining effects.</p></details>}
+          {isExtension && <details className="controls-help muted"><summary>How does site access work?</summary><p>To adjust one website, open it and click the Accessify toolbar icon. To apply your choices automatically across websites, select Allow site access and accept Chrome's permission prompt. Chrome settings and other protected pages cannot be adjusted. You can review or revoke access in Chrome's Extensions → Accessify → Details → Site access. Refresh adjusted pages after revoking access to remove any remaining effects.</p></details>}
         </div>
         <p role="status" className={status ? "controls-feedback text-sm" : ""}>{status}</p>
         {error && <p role="alert" className="controls-feedback text-sm">{error}</p>}
@@ -552,6 +561,6 @@ export default function App() {
       <p className="closing-note muted text-center text-xs">Made for different minds, eyes, and ways of moving through the world.</p>
     </main>
 
-    <footer className="site-footer"><div className="flex flex-wrap items-center justify-between gap-4"><p className="text-xs">A small project. A more accessible web.</p><a className="repo-link flex items-center gap-2 text-xs" href="https://github.com/PhoneThantTayza/HackCamp" target="_blank" rel="noreferrer"><Icon name="github" size={16} />Built together on GitHub<Icon name="arrow" size={14} /></a></div><div className="footer-bottom flex flex-wrap items-center justify-between gap-3 text-xs muted"><span>Gricelia Lin <span aria-hidden="true">·</span> Phone Thant Tayza <span aria-hidden="true">·</span> Tonnam Tantikamnerdkul</span><span>Clearspace · HackCamp 2026</span></div></footer>
+    <footer className="site-footer"><div className="flex flex-wrap items-center justify-between gap-4"><p className="text-xs">A small project. A more accessible web.</p><a className="repo-link flex items-center gap-2 text-xs" href="https://github.com/PhoneThantTayza/HackCamp" target="_blank" rel="noreferrer"><Icon name="github" size={16} />Built together on GitHub<Icon name="arrow" size={14} /></a></div><div className="footer-bottom flex flex-wrap items-center justify-between gap-3 text-xs muted"><span>Gricelia Lin <span aria-hidden="true">·</span> Phone Thant Tayza <span aria-hidden="true">·</span> Tonnam Tantikamnerdkul</span><span>Accessify · HackCamp 2026</span></div></footer>
   </div>;
 }

@@ -45,15 +45,15 @@ export async function applyToTarget() {
   const value = new URLSearchParams(location.search).get("tab");
   const targetId = value && /^\d+$/.test(value) ? Number(value) : null;
   const automatic = await chrome.permissions.contains({ origins: ["http://*/*", "https://*/*"] });
-  const tabs = automatic ? await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }) : [];
-  const targetIds = new Set(tabs.map(tab => tab.id));
+  const tabs = await chrome.tabs.query({});
+  const targetIds = new Set(tabs.filter(tab => Number.isInteger(tab.id) && (!tab.url || /^https?:\/\//.test(tab.url))).map(tab => tab.id));
   if (targetId !== null) targetIds.add(targetId);
   if (!targetIds.size) {
     if (automatic) return "Settings saved. Open a website to use your adjustments automatically.";
     throw new Error("Settings saved, but no website is connected. Open the website you want to adjust, click the Clearspace toolbar icon, and your saved settings will apply. Or select Allow site access here to apply automatically.");
   }
   const results = await Promise.allSettled([...targetIds].map(async tabId => {
-    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], world: "ISOLATED" });
+    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"], world: "ISOLATED" });
     const main = injected.find(frame => frame.frameId === 0);
     // Verify explicitly instead of relying on the completion value of a batch
     // of script files. Pin verification to the injected document if available.

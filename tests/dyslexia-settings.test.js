@@ -51,7 +51,7 @@ test('extension adapter persists the UI contract and injects the engine before i
   globalThis.chrome = { runtime: { id: 'test-extension' }, storage: { local: {
     get: async () => ({ settings: stored }),
     set: async value => { stored = value.settings; },
-  } }, permissions: { contains: async () => false }, scripting: { executeScript: async value => {
+  } }, tabs: { query: async () => [] }, permissions: { contains: async () => false }, scripting: { executeScript: async value => {
     injections.push(value);
     return [{ frameId: 0, documentId: 'test-document', result: { applied: true } }];
   } } };
@@ -68,7 +68,7 @@ test('extension adapter persists the UI contract and injects the engine before i
     assert.match(await applyToTarget(), /applied to 1 website tab/);
     assert.deepEqual(injections[0], {
       target: { tabId: 42 }, world: 'ISOLATED',
-      files: ['color-vision.js', 'low-vision.js', 'light-sensitivity.js', 'focus-mode.js', 'dyslexia.js', 'selection-reader.js', 'content.js'],
+      files: ['color-vision.js', 'low-vision.js', 'light-sensitivity.js', 'focus-mode.js', 'dyslexia.js', 'selection-reader.js', 'word-lookup.js', 'content.js'],
     });
     assert.deepEqual(injections[1].target, { tabId: 42, documentIds: ['test-document'] });
     assert.equal(typeof injections[1].func, 'function');

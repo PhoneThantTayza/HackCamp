@@ -11,7 +11,7 @@
   function normalize(value) {
     return {
       mode: Object.hasOwn(palettes, value?.mode) ? value.mode : "off",
-      strength: Number.isFinite(value?.strength) ? Math.round(Math.max(0, Math.min(100, value.strength))) : 70,
+      strength: Number.isFinite(value?.strength) ? Math.round(Math.max(0, Math.min(200, value.strength))) : 70,
       cues: value?.cues === true,
     };
   }

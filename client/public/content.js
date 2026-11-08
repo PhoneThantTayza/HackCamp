@@ -16,7 +16,7 @@
   };
   // Reuse this revision on repeated Apply, but replace older page scripts so
   // newly added adjustments work on tabs that were already connected.
-  const revision = "focus-dyslexia-1";
+  const revision = "word-lookup-restored-5";
   const previousApply = globalThis.clearspaceApply;
   if (previousApply?.revision === revision) {
     return applySavedSettings();
@@ -38,6 +38,7 @@
   let restoreFocus;
   const dyslexia = globalThis.clearspaceDyslexia?.createController(document);
   const speech = globalThis.clearspaceSelectionReader?.createController(document, api);
+  const wordLookup = globalThis.clearspaceWordLookup?.createController(document, api);
   let restoreContrast;
   let restoreSurfaces;
   let filterSvg;
@@ -82,6 +83,7 @@
     sheet = undefined;
     dyslexia?.reset();
     speech?.update(settings);
+    wordLookup?.update(settings);
     filterSvg?.remove();
     filterSvg = undefined;
     if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) return;

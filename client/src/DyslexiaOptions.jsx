@@ -10,7 +10,7 @@ const sections = [
   ] },
   { title: 'Reading comprehension', choices: [
     ['overwhelmingParagraphs', 'Long paragraphs feel overwhelming', 'Extra paragraph space, shorter lines, more line spacing.'],
-    ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Word explanations coming later.', true],
+    ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Select a word or short phrase to open Google results for its definition and pronunciation. Selected text is sent to Google.'],
   ], note: 'Summaries and simpler language coming later.' },
   { title: 'Reading focus & tracking', choices: [
     ['losePlace', 'I lose my place while reading', 'Pointer-following guide over text and controls. Right-click toggles.'],
