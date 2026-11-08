@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, isFirefox, extensionApi, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { getAccount, signIn, signOut, downloadSettings, uploadSettings, callbackUrl } from "./account.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
@@ -17,6 +17,7 @@ function Icon({ name, size = 20, ...props }) {
   const paths = {
     arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
     sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>,
+    person: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>,
     moon: <path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10Z" />,
     eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
     brain: <><path d="M12 5a3 3 0 0 0-6 0v.4a4 4 0 0 0-2 6.6 4 4 0 0 0 2 6.6v.4a3 3 0 0 0 6 0V5Zm0 0a3 3 0 0 1 6 0v.4a4 4 0 0 1 2 6.6 4 4 0 0 1-2 6.6v.4a3 3 0 0 1-6 0" /><g className="brain-folds"><path d="M6 5c0 2 1 3 3 3m-5 4h3c2 0 2 3 0 3m-1 4c0-2 1-3 3-3m9-11c0 2-1 3-3 3m5 4h-3c-2 0-2 3 0 3m1 4c0-2-1-3-3-3" /></g></>,
@@ -560,7 +561,18 @@ export default function App() {
   return <div className={`app ${light ? "light" : ""} ${sidePanel ? 'side-panel' : ''}`}>
     <header className="site-header flex items-center justify-between gap-4">
       <a href="#" className="brand flex items-center gap-2.5" aria-label="Accessify home"><span className="brand-mark"><img src="./icons/logo-128.png" width="28" height="28" alt="" /></span>accessify<span className="prototype-tag">BETA</span></a>
-      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that accessible for you.</span>{sidePanel && <a className="icon-button" href="./index.html" target="_blank" rel="noopener noreferrer" aria-label="Open full settings page"><Icon name="arrow" size={18} /></a>}<button className="icon-button" disabled={!ready} onClick={() => setLight(current => !current)} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
+      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that accessible for you.</span>{sidePanel && <a className="icon-button" href="./index.html" target="_blank" rel="noopener noreferrer" aria-label="Open full settings page"><Icon name="arrow" size={18} /></a>}<details className="account-menu" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary").focus(); } }}><summary className="icon-button" aria-label={account ? "Account" : "Sign in"}><Icon name="person" /></summary>      <section className="account-dropdown account-section" aria-labelledby="account-title">
+        <div className="browsing-controls"><div className="controls-actions">
+          <div className="reset-copy"><h3 id="account-title" className="text-sm font-medium">{account ? `Signed in${account.name ? ` as ${account.name}` : ""}` : "Keep your settings everywhere"}</h3>
+            <p className="muted control-description">{account ? account.email : "Optional. Sign in with Auth0 to save your preferences to your account and get them back on any computer. Only your settings are saved."}</p></div>
+          {account
+            ? <div className="flex gap-2"><button type="button" className="secondary-button" onClick={async () => sync(await loadSettings())}>Sync now</button><button type="button" className="secondary-button" onClick={handleSignOut}>Sign out</button></div>
+            : <button type="button" className="secondary-button" disabled={!ready || !isExtension} onClick={handleSignIn}>Sign in with Auth0<Icon name="person" size={15} /></button>}
+        </div>
+        {!isExtension && <p className="muted control-description">Sign in is available in the installed extension.</p>}{isExtension && !account && <details className="controls-help muted"><summary>Setting up Auth0?</summary><p>Add <code>{callbackUrl()}</code> to Allowed Callback URLs in your Auth0 application, and run <code>npm run dev</code> for the sync server.</p></details>}
+        </div>
+        <p role="status" className={accountStatus ? "controls-feedback text-sm" : ""}>{accountStatus}</p>
+      </section></details><button className="icon-button" disabled={!ready} onClick={() => setLight(current => !current)} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
     </header>
 
     <main className="main-content w-full mx-auto">
@@ -582,18 +594,7 @@ export default function App() {
 
       {ready && (sidePanel ? <details className="panel-preview"><summary>Try a sample page<span className="muted">Preview your adjustments</span></summary>{preview}</details> : preview)}
 
-      {isExtension && <section className="extension-controls account-section" aria-labelledby="account-title">
-        <div className="browsing-controls"><div className="controls-actions">
-          <div className="reset-copy"><h3 id="account-title" className="text-sm font-medium">{account ? `Signed in${account.name ? ` as ${account.name}` : ""}` : "Keep your settings everywhere"}</h3>
-            <p className="muted control-description">{account ? account.email : "Optional. Sign in with Auth0 to save your preferences to your account and get them back on any computer. Only your settings are saved."}</p></div>
-          {account
-            ? <div className="flex gap-2"><button type="button" className="secondary-button" onClick={async () => sync(await loadSettings())}>Sync now</button><button type="button" className="secondary-button" onClick={handleSignOut}>Sign out</button></div>
-            : <button type="button" className="secondary-button" disabled={!ready} onClick={handleSignIn}>Sign in with Auth0<Icon name="arrow" size={15} /></button>}
-        </div>
-        {!account && <details className="controls-help muted"><summary>Setting up Auth0?</summary><p>Add <code>{callbackUrl()}</code> to Allowed Callback URLs in your Auth0 application, and run <code>npm run dev</code> for the sync server.</p></details>}
-        </div>
-        <p role="status" className={accountStatus ? "controls-feedback text-sm" : ""}>{accountStatus}</p>
-      </section>}
+
 
       <section className="extension-controls" aria-label="Browsing controls">
         {!isExtension && <p className="optional-tag mb-4">LOCAL UI DEMO — does not adjust websites</p>}

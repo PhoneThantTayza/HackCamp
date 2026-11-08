@@ -19,7 +19,7 @@ export function extensionManifest(base, target = 'chrome') {
     gecko: {
       id: 'accessify@hackcamp.local',
       strict_min_version: '142.0',
-      data_collection_permissions: { required: ['none'], optional: ['websiteContent'] },
+      data_collection_permissions: { required: ['none'], optional: ['websiteContent', 'personallyIdentifyingInfo', 'technicalAndInteraction'] },
     },
   };
   return manifest;

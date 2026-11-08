@@ -45,7 +45,12 @@
         utterance.rate = Math.min(2, Math.max(0.5, Number(speech?.rate) || 1));
         if (message.languageHint) utterance.lang = message.languageHint;
         const voice = speechSynthesis.getVoices().find(item => item.name === speech?.voiceName);
-        if (voice) utterance.voice = voice;
+        if (globalThis.browser?.runtime?.getBrowserInfo) {
+          const local = speechSynthesis.getVoices().filter(item => item.localService === true);
+          const matching = local.find(item => item.name === speech?.voiceName) ?? local.find(item => item.lang === message.languageHint) ?? local[0];
+          if (!matching) return { ok: false, message: 'No local speech voice is available. Install a voice in your operating system speech settings.' };
+          utterance.voice = matching;
+        } else if (voice) utterance.voice = voice;
         const report = (state, text) => speechListeners.forEach(fn => fn({ type: "clearspace:speech-status", requestId: message.requestId, state, message: text }));
         utterance.onstart = () => report("speaking", "Reading preview…");
         utterance.onend = () => report("done", "Finished reading.");

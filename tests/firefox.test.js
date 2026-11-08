@@ -16,7 +16,7 @@ test('Firefox manifest uses document background and sidebar without changing the
   assert.ok(!result.permissions.includes('sidePanel'));
   assert.ok(!result.permissions.includes('tts'));
   assert.deepEqual(result.optional_host_permissions, base.optional_host_permissions);
-  assert.deepEqual(result.browser_specific_settings.gecko.data_collection_permissions, { required: ['none'], optional: ['websiteContent'] });
+  assert.deepEqual(result.browser_specific_settings.gecko.data_collection_permissions, { required: ['none'], optional: ['websiteContent', 'personallyIdentifyingInfo', 'technicalAndInteraction'] });
   for (const file of result.background.scripts) assert.ok(readFileSync(`client/public/${file}`, 'utf8'));
 });
 
@@ -51,4 +51,23 @@ test('Firefox toolbar opens the sidebar inside the action gesture', () => {
   vm.runInContext(readFileSync('client/public/background.js', 'utf8'), context);
   clicked({ windowId: 1 });
   assert.equal(opened, 1);
+});
+
+test('Firefox lookup sends no selected text without its optional data permission', async () => {
+  let listener, consent = false;
+  const opened = [];
+  const browser = {
+    runtime: { id: 'accessify', getBrowserInfo() {}, onMessage: { addListener(fn) { listener = fn; } } },
+    storage: { local: { get: async () => ({ settings: { version: 1, enabled: true, dyslexia: { experiences: { unfamiliarWords: true } } } }) } },
+    permissions: { contains: async () => consent },
+    windows: { onRemoved: { addListener() {} }, get: async () => ({ width: 1000, height: 800, left: 0, top: 0 }), create: async options => { opened.push(options); return { id: 3, tabs: [{ id: 30 }] }; } },
+  };
+  const context = vm.createContext({ browser });
+  vm.runInContext(readFileSync('client/public/word-lookup-background.js', 'utf8'), context);
+  const send = () => new Promise(resolve => listener({ type: 'clearspace:word-lookup', text: 'Extraordinary' }, { id: 'accessify', tab: { id: 1, windowId: 2 }, url: 'https://example.com' }, resolve));
+  assert.equal((await send()).cancelled, true);
+  assert.equal(opened.length, 0);
+  consent = true;
+  assert.equal((await send()).ok, true);
+  assert.equal(new URL(opened[0].url).searchParams.get('q'), 'Extraordinary definition pronunciation');
 });

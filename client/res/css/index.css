@@ -253,3 +253,11 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
   .secondary-button:is(:hover, :focus-visible) > [data-icon="arrow"],
   .repo-link:is(:hover, :focus-visible) > [data-icon="arrow"] { animation-name: icon-nudge; }
 }
+
+.account-menu { position: relative; }
+.account-menu > summary { list-style: none; cursor: pointer; }
+.account-menu > summary::-webkit-details-marker { display: none; }
+.account-dropdown { position: absolute; top: calc(100% + 12px); right: 0; z-index: 20; width: min(340px, calc(100vw - 40px)); max-height: 70vh; overflow-y: auto; overflow-wrap: anywhere; background: var(--surface); border: 1px solid var(--border); border-radius: 15px; padding: 18px; box-shadow: 0 12px 32px #0003; }
+.account-dropdown .browsing-controls { padding: 0; border: 0; background: transparent; }
+.account-dropdown .controls-actions { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.account-dropdown .secondary-button { flex: 1; }

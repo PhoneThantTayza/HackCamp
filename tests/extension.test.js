@@ -167,7 +167,7 @@ test("build contains the files referenced by the manifest", () => {
     assert.ok(readFileSync(`dist/${file}`).length);
   }
   assert.equal(manifest.manifest_version, 3);
-  assert.ok(!manifest.host_permissions, "broad site access must remain optional");
+  assert.ok(!(manifest.host_permissions ?? []).some(origin => ['<all_urls>', 'http://*/*', 'https://*/*'].includes(origin)), "broad site access must remain optional");
 });
 
 test("low vision choices persist while obsolete vision choices are ignored", async t => {

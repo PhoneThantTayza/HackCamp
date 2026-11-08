@@ -29,6 +29,11 @@ try {
   const errors = []; panel.on('pageerror', error => errors.push(error.message));
   await panel.goto(`chrome-extension://${id}/index.html?panel=1`);
   await panel.locator('fieldset:not([disabled])').waitFor();
+  const signIn = panel.getByRole('button', { name: 'Sign in with Auth0' });
+  await signIn.scrollIntoViewIfNeeded();
+  assert.equal(await signIn.isVisible(), true, 'Auth0 sign-in is visible in the installed extension');
+  assert.equal(await signIn.isEnabled(), true);
+  assert.ok((await panel.locator('.account-section code').first().textContent()).startsWith(`https://${id}.chromiumapp.org/`));
   await panel.waitForFunction(() => innerWidth === 360);
   assert.equal(await panel.locator('.side-panel').count(), 1);
   assert.equal(await panel.locator('.choice-card').count(), 4);

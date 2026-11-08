@@ -1,4 +1,31 @@
-# Clearspace Chrome extension
+# Accessify browser extension
+
+## Firefox desktop (142+)
+
+Build the Firefox package separately; the Chrome package is unchanged:
+
+```powershell
+npm run build:firefox
+# Chrome:
+npm run build
+```
+
+In Firefox, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select `dist-firefox/manifest.json`. Click Accessify's toolbar button to open its native sidebar. Temporary installations are removed when Firefox restarts. Publishing permanent installations requires Mozilla signing.
+
+The Firefox build replaces Chrome's service worker, sidePanel and tts permissions with a document background, Firefox sidebar and local Web Speech voices. The settings UI and webpage adjustments are shared. Site access remains optional: click the toolbar on one website, or allow site access for automatic adjustment. Browser settings, Mozilla Add-ons pages and other protected pages cannot be adjusted.
+
+Google word lookup asks for Firefox's optional website-content transmission permission when enabled. Account sync separately asks for optional account and preference data permissions; all adjustments work without signing in. The add-on ID is `accessify@hackcamp.local`; keep it stable after publishing. Add the Firefox-specific callback URL shown under **Setting up Auth0?** to Auth0's Allowed Callback URLs. The existing sync server and Auth0 configuration are still required for account sync; local adjustments do not need them.
+
+Firefox read-aloud uses only voices marked as local by the operating system. If none are installed, it reports that rather than using a cloud voice. Headless tests cannot confirm audible output. Firefox Android and authenticated account sync are not included in the automated desktop verification.
+
+Validation commands:
+
+```powershell
+node --test tests/firefox.test.js tests/extension.test.js tests/selection-tts.test.js
+npx web-ext lint --source-dir dist-firefox
+```
+
+`node tests/firefox.browser.mjs` runs the disposable desktop integration test. Set `A11YFIX_FIREFOX` to a Firefox executable and `A11YFIX_GECKODRIVER` to GeckoDriver 0.37+ (the test enables browser-level access only in its temporary profile). The test temporarily grants localhost access and mocks external lookup results; production permissions remain optional.
 
 ## Install the extension
 
