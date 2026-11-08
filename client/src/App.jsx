@@ -211,7 +211,7 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query, mutual
     { title: 'Reading comprehension', choices: [
       ['overwhelmingParagraphs', 'Long paragraphs feel overwhelming', 'Extra paragraph space, shorter lines, more line spacing.'],
       ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Select a word or short phrase to open a definition and pronunciation.'],
-    ], note: 'Summaries and simpler language coming later.' },
+    ]},
     { title: 'Reading focus & tracking', choices: [
       ['losePlace', 'Focus mode', 'Shared by Dyslexia and Cognitive. A colored reading band follows your pointer. Right-click toggles.'],
     ] },
