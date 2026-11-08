@@ -266,7 +266,6 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
         </div>
       </section>; })}
       {!filtered.length && <p className="muted text-xs">No matching experiences.</p>}
-      <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
   </div>;
 }
 
