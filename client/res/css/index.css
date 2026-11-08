@@ -111,3 +111,8 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .low-vision-sample-focus { padding: 22px; }
 .low-vision-sample-focus button { margin-top: 0; }
 .low-vision-sample-focus.is-adjusted .sample-focus-target { outline: var(--low-outline) solid #000; outline-offset: var(--low-outline); box-shadow: 0 0 0 var(--low-ring) #fff; }
+
+.light-sensitivity-sample { margin-top: 8px; padding: 14px; border-radius: 6px; background: #fff; color: #30343b; font-size: 12px; line-height: 1.6; }
+.light-sensitivity-sample p { margin: 0 0 6px; }
+.light-sensitivity-sample a { color: #2463a6; text-decoration: underline; }
+.light-sensitivity-sample button { display: block; margin-top: 10px; padding: 6px 10px; border: 1px solid #9ca3af; border-radius: 4px; background: #f3f4f6; color: #30343b; font: inherit; }
