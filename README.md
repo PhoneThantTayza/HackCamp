@@ -1,4 +1,17 @@
-# Clearspace Chrome extension
+# Clearspace
+
+## Desktop app — macOS and Windows
+
+Clearspace now includes a desktop app with Vision, Dyslexia, Motor / mobility, and Cognitive controls. It adds desktop reading guides, dimming, background softening, warm tint, system Dark mode, desktop colour assistance, focus outlines, active-application detection, a reading view, and a browser companion.
+
+```sh
+npm install
+npm run desktop
+```
+
+Use Node.js 24. macOS needs the Xcode Command Line Tools; Windows builds its helper using the system .NET Framework compiler. **[Desktop setup, feature coverage, testing, and packaging](docs/desktop.md)** explains permissions and the browser connection. The UI labels adjustments that work across the desktop, in the reading view/websites, or through system settings. Other applications retain control of their own fonts, layouts, and button sizes.
+
+Run `npm run desktop:package` on each target OS to create installers in `release/`. Windows/macOS CI builds are included. Public distribution still requires signing credentials and testing on the target machines.
 
 ## Install the extension
 
