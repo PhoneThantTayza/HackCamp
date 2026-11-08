@@ -19,9 +19,9 @@ func remapColourImage(_ input: CIImage, matrix m: [Double]) -> CIImage? {
 
 func desktopColourImage(_ input: CIImage, matrix: [Double], size: CGSize) -> CIImage? {
     guard let output = remapColourImage(input, matrix: matrix) else { return nil }
-    let scaled = output.transformed(by: CGAffineTransform(scaleX: size.width / input.extent.width, y: size.height / input.extent.height))
-    // Core Image's texture rows run upwards; the display drawable runs downwards.
-    return scaled.transformed(by: CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: size.height))
+    // Core Image already renders the captured frame the right way up into the
+    // Metal drawable, so only scale it. (An extra flip showed the desktop upside down.)
+    return output.transformed(by: CGAffineTransform(scaleX: size.width / input.extent.width, y: size.height / input.extent.height))
 }
 
 @available(macOS 12.3, *)
