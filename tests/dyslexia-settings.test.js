@@ -35,7 +35,10 @@ test('settings adapter saves and reopens dyslexia preferences in the explicitly 
     assert.equal(reopened.dyslexia.customization.guideSize, 60);
     assert.deepEqual(reopened.selected, ['vision:Larger text and controls']);
     await saveSettings({ ...reopened, enabled: false });
-    assert.equal((await loadSettings()).dyslexia.experiences.losePlace, true);
+    const resumed = await loadSettings();
+    assert.equal(resumed.dyslexia.experiences.losePlace, true);
+    assert.equal(resumed.enabled, true);
+    assert.equal(JSON.parse(stored.get('clearspace-demo')).enabled, true);
     await saveSettings({ ...defaults, dyslexia: emptyDyslexia() });
     assert.deepEqual((await loadSettings()).dyslexia, emptyDyslexia());
     assert.match(await applyToTarget(), /Demo settings saved/);

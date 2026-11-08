@@ -21,7 +21,7 @@ export default function ReadAloud({ enabled, embedded = false, preferences = {},
     <h2 id="read-aloud-title" className="text-base font-medium">Read highlighted text aloud</h2>
     <p className="muted control-description">Reading starts when you release the selection. Press Escape or use the page’s Stop button to stop.</p>
     <p className="muted control-description">To hear a button’s label without clicking it, point at it or focus it with Tab, then choose Read button label or press Alt+Shift+R.</p>
-    {!isExtension && <p className="muted text-sm">The web demo saves preferences only. Automatic reading requires the installed extension.</p>}
+    {!isExtension && <p className="muted text-sm">Try listening by selecting text in Preview all adjustments. Reading on other websites requires the installed extension.</p>}
     {isExtension && !available && <p role="alert">Reload the extension to enable speech support.</p>}
     {available && voicesLoaded && !voices.length && <p role="alert" className="muted control-description">No local speech voices are available yet. If this persists, add a voice in your device’s speech settings and restart Chrome.</p>}
     <fieldset disabled={!enabled} className="mt-4">

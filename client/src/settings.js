@@ -28,7 +28,10 @@ export async function loadSettings() {
     saved.dyslexia = shared;
     saved.selected = saved.selected.filter(option => option !== 'cognitive:Focus mode');
   }
-  return { ...defaults, ...saved, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
+  const settings = { ...defaults, ...saved, enabled: true, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
+  // Restore previously paused preferences now that adjustments are always enabled.
+  if (saved?.enabled === false) await saveSettings(settings);
+  return settings;
 }
 export async function saveSettings(settings) {
   if (isExtension) await chrome.storage.local.set({ settings });
@@ -44,7 +47,7 @@ export async function applyToTarget() {
   if (targetId !== null) targetIds.add(targetId);
   if (!targetIds.size) {
     if (automatic) return "Settings saved. Open a website to use your adjustments automatically.";
-    throw new Error("Settings saved, but no website is connected. Open the website you want to adjust, click the Clearspace toolbar icon, then Save and apply. Or select Allow site access here to apply automatically.");
+    throw new Error("Settings saved, but no website is connected. Open the website you want to adjust, click the Clearspace toolbar icon, and your saved settings will apply. Or select Allow site access here to apply automatically.");
   }
   const results = await Promise.allSettled([...targetIds].map(async tabId => {
     const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"], world: "ISOLATED" });
@@ -81,7 +84,7 @@ export async function applyToTarget() {
   const count = results.filter(result => result.status === "fulfilled").length;
   const primary = targetId === null ? null : results[[...targetIds].indexOf(targetId)];
   const isProtected = result => result?.status === "rejected" && /Cannot access a chrome|extensions gallery cannot be scripted|Cannot access.*(?:chrome:\/\/|chrome\.google\.com\/webstore|chromewebstore\.google\.com)/i.test(result.reason?.message || String(result.reason));
-  const protectedHelp = "Chrome protects this page from adjustments. Open a regular http or https website, click the Clearspace toolbar icon there, then select Save and apply.";
+  const protectedHelp = "Chrome protects this page from adjustments. Open a regular http or https website, click the Clearspace toolbar icon there, and your saved settings will apply.";
   try {
     if (isProtected(primary) || (!count && results.every(isProtected))) {
       if (count) return `Settings saved and applied to ${count} website tab${count === 1 ? "" : "s"}. ${protectedHelp}`;
