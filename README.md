@@ -12,11 +12,13 @@ node --test tests/extension.test.js
 1. Open `chrome://extensions` in Chrome.
 2. Enable **Developer mode** at the top right.
 3. Click **Load unpacked**.
-4. Select `C:\Users\ton53\Desktop\HackCamp\dist` (the folder containing manifest.json).
+4. Select this project's `dist` folder (the folder containing manifest.json).
 5. Pin **Clearspace** using Chrome's puzzle-piece Extensions menu.
 6. Open a regular webpage, click the Clearspace toolbar icon, choose adjustments, then **Save and apply**. Return to the original tab to see changes.
 
 Click the icon again after navigating to another site. Opening the settings directly through Chrome has no original target tab. For automatic behavior, use **Allow automatic adjustments on websites** and accept Chrome's permission prompt. Saved preferences then apply to permitted existing tabs and new/navigated webpages. Review or revoke permissions in Chrome's extension **Details > Site access**. Refresh adjusted pages after revoking access to clear remaining styles.
+
+If the live colour sample changes but websites do not, first check that you opened Clearspace through its extension icon, rather than localhost. With automatic site access enabled, **Save and apply** also connects open websites when settings were opened directly. Success is reported only after a webpage confirms it received and applied the saved settings. After updating the extension, rebuild, reload its extension card and refresh the website before retrying.
 
 Uncheck **Enable webpage adjustments**, then save to disable while remembering choices. **Reset adjustments** clears choices and removes styles from connected pages. The UI theme is separate from website appearance and is remembered on save.
 
@@ -25,6 +27,18 @@ After code changes, rebuild, click Reload on the extension card, refresh webpage
 `npm run dev:client` starts the labelled local UI demo; it does not modify websites. The Express scaffold below remains for teammates; the extension does not use it.
 
 ## Extension features and verification
+
+### Colour blindness
+
+Open **Vision → Colour blindness**. Select a red–green palette (red/protan or green/deutan emphasis) or a blue–yellow palette (tritan), then adjust **Strength**. The labelled, shape-coded sample compares original colours with your current settings immediately, including in the local UI demo. Select **Save and apply** to adjust the original webpage.
+
+These are assistance palettes that redistribute colour channels, not deficiency simulations or clinically validated corrections. Neutral greys and opacity are preserved. Choose the palette and strength that help you; preferences vary. Whole-page colour remapping also affects images, videos, charts and canvas as rendered on supported pages. It does not inspect or label their contents. Existing page filters are temporarily overridden and root filtering can affect fixed-position layouts.
+
+**Use cues beyond colour** works independently of the palette: it underlines links, adds borders to form controls/buttons, adds visible keyboard focus and outlines fields that the website marks `aria-invalid="true"` with dashed lines. It cannot infer missing status labels or make arbitrary colour-only charts accessible.
+
+The palette, strength and cues are saved with the other preferences and shared with connected tabs. **Off** restores the original palette while leaving other adjustments available. **Clear all** clears the colour choices along with other selections; save to apply. Switching adjustments off and saving pauses effects without losing choices. **Reset choices** removes effects and resets the colour controls. Existing saved settings start with colour assistance off.
+
+After rebuilding, reload the extension and refresh existing webpages so they load the updated scripts. Manually check each palette at 0% and 100%, switch modes, reload settings, pause/resume and reset. Try dynamic page content, a page with its own SVG/filter styles, and combining the palette with high contrast and link underlines. Check keyboard operation of the select, slider and cue checkbox. Chrome visual rendering still needs a browser check; Node tests verify filter creation/replacement/removal, independent cues, neutral-colour preservation, malformed settings and packaging.
 
 Implemented: larger text, high contrast, line/letter/button spacing, reduced CSS motion, link underlines, readable font, shorter text lines, left alignment, larger form/button targets and visible keyboard focus. Reading guide, simplified layout, distraction hiding, clear headings and shorter paragraphs are disabled and marked Coming later.
 
