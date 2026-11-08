@@ -22,12 +22,13 @@ const STYLE_ID = "clearspace-keyboard-focus-style";
 const SKIP_ID = "clearspace-skip-link";
 const TABINDEX_ATTR = "data-clearspace-added-tabindex"; // marks tabindex WE added
 
-const CSS = `
+// Builds the CSS for an outline thickness in px (3-8, from the Motor slider)
+const buildCss = (ring) => `
   /* 1. Thick two-colour ring around whatever has keyboard focus */
   :root :focus-visible {
-    outline: 4px solid #1a5fff !important;
+    outline: ${ring}px solid #1a5fff !important;
     outline-offset: 3px !important;
-    box-shadow: 0 0 0 7px #ffffff, 0 0 0 10px #111111 !important;
+    box-shadow: 0 0 0 ${ring + 3}px #ffffff, 0 0 0 ${ring + 6}px #111111 !important;
   }
   /* 2. Keep the focused element clear of sticky headers and footers */
   :root :focus {
@@ -126,7 +127,7 @@ function turnOn() {
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement("style");
     style.id = STYLE_ID;
-    style.textContent = CSS;
+    style.textContent = buildCss(currentRing);
     document.documentElement.appendChild(style);
   }
   const start = () => { if (isOn) addSkipLink(); };
@@ -149,7 +150,20 @@ function wantsFocus(settings) {
   return settings.selected.some((item) => typeof item === "string" && item.split(":")[1] === "Keyboard focus indicators");
 }
 
+let currentRing = 6;
+
+// Read the slider value (settings.motor.focus) and update the outline live.
+// Same numbers as motor-levels.js ringPx (3-8px), keep them in sync.
+function setRing(settings) {
+  const value = Number(settings?.motor?.focus);
+  currentRing = Number.isFinite(value) ? Math.round(3 + (5 * Math.max(0, Math.min(100, value))) / 100) : 6;
+  if (!isOn) return; // nothing on the page to update while the option is off
+  const style = document.getElementById(STYLE_ID);
+  if (style) style.textContent = buildCss(currentRing);
+}
+
 function apply(settings) {
+  setRing(settings);
   if (wantsFocus(settings)) turnOn();
   else turnOff();
 }

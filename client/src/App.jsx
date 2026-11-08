@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { defaults, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
 import CombinedPreview from "./CombinedPreview.jsx";
@@ -314,7 +314,101 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query, mutual
   </div>;
 }
 
-function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange, lightStrengths, onLightChange, focusSettings, onFocusChange, dyslexia, onDyslexiaChange, speechReset }) {
+const motorDescriptions = {
+  "Larger click targets": "Buttons and links get bigger, with a soft outline, so they're easier to hit.",
+  "Extra button spacing": "Buttons and links get more room between them, so you don't hit the wrong one.",
+  "Keyboard focus indicators": "A strong outline shows what you've tabbed to, plus a \"Skip to main content\" button on the first Tab.",
+  "Reduce motion": "Animations, autoplaying videos and moving GIFs calm down.",
+};
+
+// Each option's slider: which setting it changes and how each level is described
+const motorSliders = {
+  "Larger click targets": { key: "targetSize", name: "Size", text: level => `${motor.sizeLabel(level)} · ${motor.targetPx(level)}px`, ends: ["Comfortable", "Extra large"], kind: "size" },
+  "Extra button spacing": { key: "spacing", name: "Gap", text: level => `${motor.gapLabel(level)} · ${motor.gapPx(level)}px`, ends: ["Small", "Large"], kind: "spacing" },
+  "Keyboard focus indicators": { key: "focus", name: "Outline thickness", text: level => `${motor.ringLabel(level)} · ${motor.ringPx(level)}px`, ends: ["Thin", "Thick"], kind: "focus" },
+  "Reduce motion": { key: "motion", name: "Strength", text: level => motor.motionLabel(level), ends: ["Gentle", "Still"], kind: "motion" },
+};
+
+// One slide-down per Motor adjustment, styled like the Vision sections
+const motorSections = [
+  { id: "targets", name: "Larger click targets", turnOn: "Make click targets larger", description: "Choose how big buttons and links should be. Save to apply across websites with site access.", options: ["Larger click targets"] },
+  { id: "spacing", name: "Extra button spacing", turnOn: "Add space between buttons", description: "Choose how much room to leave between buttons and links.", options: ["Extra button spacing"] },
+  { id: "keyboard", name: "Keyboard", turnOn: "Show a stronger focus outline", description: "For browsing with the Tab key instead of a mouse.", options: ["Keyboard focus indicators"] },
+  { id: "motion", name: "Reduce motion", turnOn: "Reduce motion", description: "Stop things moving on their own. Choose how much to calm down.", options: ["Reduce motion"] },
+];
+
+function MotorSample({ kind, level, enabled }) {
+  if (kind === "motion") {
+    const step = motor.motionStep(level);
+    const parts = [["Animations and sliding effects", 1], ["Videos that play by themselves", 2], ["Animated GIFs and moving thumbnails", 3]];
+    return <div className="colour-preview">
+      <p className="colour-label">What {motor.motionLabel(level)} stops{!enabled && " · adjustments paused"}</p>
+      <ul className="motor-motion-list">{parts.map(([label, needed]) => <li key={label} className={step >= needed ? "" : "muted"}>{step >= needed ? "✓" : "–"} {label}</li>)}</ul>
+    </div>;
+  }
+  if (kind === "focus") {
+    const ring = motor.ringPx(level);
+    return <div className="colour-preview">
+      <p className="colour-label">Live sample{!enabled && " · adjustments paused"}</p>
+      {[false, true].map(adjusted => <div key={String(adjusted)} className="colour-sample-row">
+        <span className="muted">{adjusted ? "Your settings" : "Original"}</span>
+        <div className="motor-sample"><button type="button" style={adjusted && enabled ? { outline: `${ring}px solid #1a5fff`, outlineOffset: 3, boxShadow: `0 0 0 ${ring + 3}px #fff, 0 0 0 ${ring + 6}px #111` } : {}}>Sample focus</button></div>
+      </div>)}
+      <p className="muted control-caption">Outline shown as a preview of what keyboard focus looks like.</p>
+    </div>;
+  }
+  return <div className="colour-preview">
+    <p className="colour-label">Live sample{!enabled && " · adjustments paused"}</p>
+    {[false, true].map(adjusted => {
+      const on = adjusted && enabled;
+      const px = motor.targetPx(level);
+      const linkStyle = on && kind === "size" ? { minWidth: px, minHeight: px, padding: "0 12px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 10, outline: "2px solid color-mix(in srgb, currentColor 35%, transparent)", outlineOffset: -2 } : {};
+      const gap = on && kind === "spacing" ? motor.gapPx(level) : 4;
+      return <div key={String(adjusted)} className="colour-sample-row">
+        <span className="muted">{adjusted ? "Your settings" : "Original"}</span>
+        <div className="motor-sample" style={{ gap }}>
+          {["Reply", "Share", "Save"].map(label => <a key={label} href="#motor-options" style={linkStyle} onClick={event => event.preventDefault()}>{label}</a>)}
+        </div>
+      </div>;
+    })}
+  </div>;
+}
+
+function MotorSection({ section, options, selected, onToggle, value, onChange, enabled }) {
+  const [open, setOpen] = useState(false);
+  return <div className="low-vision-controls">
+    <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls={`motor-${section.id}-options`} onClick={() => setOpen(!open)}><span>{section.name}</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
+    <div id={`motor-${section.id}-options`} hidden={!open}>
+      <p className="muted control-description">{section.description}</p>
+      {options.map(option => {
+        const on = selected.includes(`motor:${option}`);
+        const slider = motorSliders[option];
+        const level = value[slider.key];
+        const id = `motor-${slider.key}`;
+        return <div key={option} className="low-vision-option">
+          <label className="option-row"><input type="checkbox" checked={on} onChange={() => onToggle(`motor:${option}`)} /><span>{section.turnOn}<small className="muted block">{motorDescriptions[option]}</small></span></label>
+          {on && <>
+            <div className="colour-strength"><label htmlFor={id}>{slider.name}<span className="sr-only"> for {option}</span></label><output htmlFor={id}>{slider.text(level)}</output></div>
+            <input id={id} className="colour-range" type="range" min="0" max="100" step="5" value={level} aria-valuetext={slider.text(level)} onChange={event => onChange({ ...value, [slider.key]: Number(event.target.value) })} />
+            <div className="motor-range-ends muted" aria-hidden="true"><span>{slider.ends[0]}</span><span>{slider.ends[1]}</span></div>
+            <MotorSample kind={slider.kind} level={level} enabled={enabled} />
+          </>}
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+function MotorControls({ options, ...props }) {
+  return <div id="motor-options">
+    {motorSections.map(section => {
+      const shown = section.options.filter(option => options.includes(option)); // respects the card's search
+      return shown.length > 0 && <MotorSection key={section.id} section={section} options={shown} {...props} />;
+    })}
+  </div>;
+}
+
+function AccessibilityCard({ group, motorSettings, onMotorChange, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange, lightStrengths, onLightChange, focusSettings, onFocusChange, dyslexia, onDyslexiaChange, speechReset }) {
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
@@ -336,7 +430,8 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
     </button>
     {open && <div id={`${group.id}-options`} className="options-list">
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
-      {options.map(option => <React.Fragment key={option}>
+      {group.id === "motor" && options.length > 0 && <MotorControls options={options} selected={selected} onToggle={onToggle} value={motorSettings} onChange={onMotorChange} enabled={enabled} />}
+      {group.id !== "motor" && options.map(option => <React.Fragment key={option}>
         <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
         {group.id === "cognitive" && option === "Focus mode" && selected.includes("cognitive:Focus mode") && <FocusModeControls value={focusSettings} onChange={onFocusChange} enabled={enabled} />}
       </React.Fragment>)}
@@ -357,6 +452,7 @@ export default function App() {
   const enabled = true;
   const [colour, setColour] = useState(defaults.colorVision);
   const [lowVisionStrengths, setLowVisionStrengths] = useState(defaults.lowVision);
+  const [motorSettings, setMotorSettings] = useState(defaults.motor);
   const [focusSettings, setFocusSettings] = useState(defaults.focusMode);
   const [lightStrengths, setLightStrengths] = useState(defaults.lightSensitivity);
   const [ready, setReady] = useState(false);
@@ -367,11 +463,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [speechReset, setSpeechReset] = useState(0);
   useEffect(() => { loadSettings().then(settings => {
-    setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
+    setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setMotorSettings(settings.motor); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
   useEffect(() => {
     if (!ready) return;
-    const settings = { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia };
+    const settings = { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia, motor: motorSettings };
     const snapshot = JSON.stringify(settings);
     // Loading saved preferences must not overwrite them or trigger a new save.
     if (lastSettings.current === null) { lastSettings.current = snapshot; return; }
@@ -391,14 +487,15 @@ export default function App() {
         if (revision === saveRevision.current) { setStatus(""); setError(error.message); }
       }
     });
-  }, [ready, enabled, selected, light, colour, lowVisionStrengths, lightStrengths, focusSettings, dyslexia]);
+  }, [ready, enabled, selected, light, colour, lowVisionStrengths, lightStrengths, focusSettings, dyslexia, motorSettings]);
   function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); }
   function changeDyslexia(value) { const customization = { ...value.customization }; delete customization.guide; setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode')); }
   function changeColour(value) { setColour(value); }
+  function changeMotor(value) { setMotorSettings(value); }
   function changeLowVision(value) { setLowVisionStrengths(value); }
   function changeLight(value) { setLightStrengths(value); }
   function changeFocus(value) { setFocusSettings(value); }
-  function clearChoices() { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); }
+  function clearChoices() { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setMotorSettings(defaults.motor); }
   function resetChoices() { clearChoices(); setSpeechReset(value => value + 1); }
   const choiceCount = selected.length + Number(colour.mode !== "off") + Number(colour.cues) + dyslexiaChoiceCount(dyslexia);
 
@@ -427,7 +524,7 @@ export default function App() {
       <section className="accessibility-section" aria-labelledby="adjustments-title">
         <div className="flex items-center justify-between gap-3 mb-2"><h2 id="adjustments-title" className="text-sm font-medium">What would make browsing easier?</h2><span className="optional-tag">OPTIONAL</span></div>
         <p className="muted text-sm">Choose what works for you. You can mix and match.</p>
-        <fieldset disabled={!ready} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} focusSettings={focusSettings} onFocusChange={changeFocus} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
+        <fieldset disabled={!ready} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} motorSettings={motorSettings} onMotorChange={changeMotor} focusSettings={focusSettings} onFocusChange={changeFocus} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
         {choiceCount > 0 && <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{`${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.`}</span><button type="button" className="clear-button shrink-0" disabled={!ready} onClick={clearChoices}>Clear all</button></div>}
 
       </section>
