@@ -5,6 +5,28 @@ import { readFileSync } from 'node:fs';
 const context = vm.createContext({});
 vm.runInContext(readFileSync('client/public/dyslexia.js', 'utf8'), context);
 const { suggest, createController } = context.clearspaceDyslexia;
+const { chooseHighlight } = context.clearspaceDyslexia;
+const luminance = rgb => rgb.map(c => c / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4)
+  .reduce((sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
+const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
+
+test('passage highlights balance text readability and page separation without changing inputs', () => {
+  for (const [text, background] of [
+    [[0, 0, 0], [255, 255, 255]], [[255, 255, 255], [0, 0, 0]],
+    [[238, 238, 238], [17, 17, 17]], [[32, 32, 32], [250, 250, 249]],
+    [[0, 80, 200], [255, 255, 255]], [[128, 128, 128], [128, 128, 128]],
+  ]) {
+    const original = JSON.stringify([text, background]);
+    const highlight = Array.from(chooseHighlight(text, background));
+    assert.ok(contrast(text, highlight) >= 4.5, `${text} remains readable on ${highlight}`);
+    assert.ok(contrast(background, highlight) > 1.2, 'highlight differs from its surroundings');
+    assert.equal(JSON.stringify([text, background]), original);
+  }
+  const black = [0, 0, 0], white = [255, 255, 255];
+  assert.ok(contrast(white, Array.from(chooseHighlight(black, white))) >= 2.9);
+  assert.ok(contrast(black, Array.from(chooseHighlight(white, black))) >= 2.9);
+  assert.notDeepEqual(Array.from(chooseHighlight(black, white)), Array.from(chooseHighlight(black, black)));
+});
 
 test('presets have different primary effects and combine without weakening other choices', () => {
   const words = suggest({ experiences: { distinguishWords: true } });

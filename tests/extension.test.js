@@ -631,7 +631,7 @@ test("focus spotlight starts off, toggles with right click, pauses with Escape, 
   assert.deepEqual(root.children, [website]);
 });
 
-test("focus preferences survive saving, normalize old settings and reset to defaults", async t => {
+test("legacy focus preferences migrate to the shared reading guide and reset to defaults", async t => {
   const previous = globalThis.localStorage;
   t.after(() => { if (previous === undefined) delete globalThis.localStorage; else globalThis.localStorage = previous; });
   let stored = JSON.stringify({ version: 1, enabled: true, selected: ["motor:Reduce motion"] });
@@ -640,7 +640,19 @@ test("focus preferences survive saving, normalize old settings and reset to defa
   assert.deepEqual((await loadSettings()).focusMode, { height: 120, dimming: 60 });
   await saveSettings({ ...defaults, selected: ["cognitive:Focus mode", "cognitive:Hide distractions"], focusMode: { height: 200, dimming: 35 } });
   assert.deepEqual((await loadSettings()).focusMode, { height: 200, dimming: 35 });
-  assert.deepEqual((await loadSettings()).selected, ["cognitive:Focus mode", "cognitive:Hide distractions"]);
+  const migrated = await loadSettings();
+  assert.deepEqual(migrated.selected, ["cognitive:Hide distractions"]);
+  assert.equal(migrated.dyslexia.experiences.losePlace, true);
+  assert.equal(migrated.dyslexia.customization.guideSize, 160);
+  assert.equal(migrated.dyslexia.customization.dimming, 0.35);
+  await saveSettings({ ...defaults, enabled: false, selected: ["cognitive:Focus mode"], focusMode: { height: 80, dimming: 25 } });
+  const resumed = await loadSettings();
+  assert.equal(resumed.enabled, true);
+  assert.deepEqual(resumed.selected, []);
+  assert.equal(resumed.dyslexia.experiences.losePlace, true);
+  assert.equal(resumed.dyslexia.customization.guideSize, 80);
+  assert.equal(resumed.dyslexia.customization.dimming, 0.25);
+  assert.deepEqual(JSON.parse(stored), resumed);
   await saveSettings(defaults);
   assert.deepEqual((await loadSettings()).focusMode, defaults.focusMode);
   assert.deepEqual((await loadSettings()).selected, []);
