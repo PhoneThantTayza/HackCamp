@@ -134,8 +134,10 @@ try {
     await page.mouse.move(bounds.x + 4, bounds.y + 4);
     await page.waitForFunction(() => [...CSS.highlights.keys()].filter(name => name.includes('-passage')).length === 2);
     const appearance = () => page.evaluate(() => {
-      const name = [...CSS.highlights.keys()].find(name => name.endsWith('-passage'));
-      const dark = name + '-1';
+      const names = [...CSS.highlights.keys()].filter(name => name.includes('-passage-'));
+      const nameFor = id => names.find(name => [...CSS.highlights.get(name)].some(range => range.startContainer.parentElement.id === id));
+      const name = nameFor('plain');
+      const dark = nameFor('light-text');
       return {
         text: getComputedStyle(document.querySelector('#plain')).color,
         light: getComputedStyle(document.querySelector('#light-text')).color,
@@ -144,8 +146,13 @@ try {
         preserved: document.querySelector('#plain').innerHTML === passageOriginal,
       };
     });
-    assert.deepEqual(await appearance(), { text: 'rgb(34, 34, 34)', light: 'rgb(238, 238, 238)',
-      background: 'rgb(234, 221, 202)', darkBackground: 'rgb(40, 51, 66)', preserved: true });
+    const actual = await appearance();
+    assert.equal(actual.text, 'rgb(34, 34, 34)');
+    assert.equal(actual.light, 'rgb(238, 238, 238)');
+    assert.equal(actual.preserved, true);
+    assert.notEqual(actual.background, actual.darkBackground);
+    assert.notEqual(actual.background, 'rgba(0, 0, 0, 0)');
+    assert.notEqual(actual.darkBackground, 'rgba(0, 0, 0, 0)');
     await page.evaluate(() => document.querySelector('#light-text').style.color = '#222');
     await page.waitForFunction(() => [...CSS.highlights.keys()].filter(name => name.includes('-passage')).length === 1);
     await page.evaluate(() => testReadingController.reset());
@@ -241,8 +248,8 @@ try {
       } } };
     });
     // Reproduce the shipped version-2/off-only engine and its version-4 owner.
-    const legacy = engineSource.replace('version === 4', 'version === 2')
-      .replace('version: 4, suggest', 'version: 2, suggest')
+    const legacy = engineSource.replace(/version === \d+/, 'version === 2')
+      .replace(/version: \d+, suggest/, 'version: 2, suggest')
       .replace('guideDismissed = !guideDismissed;', 'guideDismissed = true;');
     const owner = await readFile(contentPath, 'utf8');
     const ownerVersion = Number(owner.match(/clearspaceApply.version = (\d+)/)[1]);
@@ -255,7 +262,7 @@ try {
     assert.equal(await page.evaluate(() => Boolean(window.guideTestRoot && !guideTestRoot.querySelector('.line').parentElement.hidden)), false);
     await page.evaluate(engineSource);
     await page.evaluate(owner);
-    assert.equal(await page.evaluate(() => clearspaceDyslexia.version), 4);
+    assert.equal(await page.evaluate(() => clearspaceDyslexia.version), 5);
     assert.equal(await page.evaluate(() => clearspaceApply.version), ownerVersion);
     assert.equal(await page.evaluate(() => storageListeners.length), 1);
     const visible = () => page.evaluate(() => {

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { defaults, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
+import DyslexiaSlider from './DyslexiaSlider.jsx';
 
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
@@ -268,11 +269,9 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
             <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
           </select>
         </label>}
-        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
-          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
-            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
-            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
-        </label>)}
+        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(field => <DyslexiaSlider key={field[0]}
+          field={field} custom={custom} onChange={customize}
+          suggested={globalThis.clearspaceDyslexia.suggest({ ...value, experiences: { ...value.experiences, [id]: true } })} />)}
         {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
           <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
             <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
