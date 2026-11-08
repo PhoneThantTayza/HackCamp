@@ -4,11 +4,42 @@
   "version": "1.0.0",
   "description": "Reversible reading and accessibility adjustments for webpages.",
   "minimum_chrome_version": "116",
-  "permissions": ["storage", "activeTab", "scripting", "tts", "sidePanel"],
-  "side_panel": { "default_path": "index.html?panel=1" },
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
-  "background": { "service_worker": "background.js" },
-  "icons": { "16": "icons/logo-16.png", "32": "icons/logo-32.png", "48": "icons/logo-48.png", "128": "icons/logo-128.png" },
-  "action": { "default_title": "Open Clearspace for this tab", "default_icon": { "16": "icons/logo-16.png", "32": "icons/logo-32.png", "48": "icons/logo-48.png", "128": "icons/logo-128.png" } },
-  "options_page": "index.html"
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tts",
+    "sidePanel",
+    "identity"
+  ],
+  "side_panel": {
+    "default_path": "index.html?panel=1"
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/logo-16.png",
+    "32": "icons/logo-32.png",
+    "48": "icons/logo-48.png",
+    "128": "icons/logo-128.png"
+  },
+  "action": {
+    "default_title": "Open Clearspace for this tab",
+    "default_icon": {
+      "16": "icons/logo-16.png",
+      "32": "icons/logo-32.png",
+      "48": "icons/logo-48.png",
+      "128": "icons/logo-128.png"
+    }
+  },
+  "options_page": "index.html",
+  "host_permissions": [
+    "https://dev-tsmyxcbitdn1q1vy.us.auth0.com/*",
+    "http://127.0.0.1:3000/*"
+  ]
 }
