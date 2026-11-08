@@ -1,3 +1,5 @@
+importScripts('selection-tts.js');
+
 // The clicked tab is kept in the settings URL, even after settings take focus.
 chrome.action.onClicked.addListener(tab => {
   chrome.tabs.create({ url: chrome.runtime.getURL(`index.html?tab=${tab.id}`) });
@@ -10,11 +12,12 @@ async function syncAutomaticAccess() {
   if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: ["clearspace-auto"] });
   if (granted) {
     await chrome.scripting.registerContentScripts([{
-      id: "clearspace-auto", matches: origins, js: ["content.js"], runAt: "document_idle"
+      id: "clearspace-auto", matches: origins, js: ["dyslexia.js", "selection-reader.js", "content.js"], runAt: "document_idle",
+      allFrames: true, matchOriginAsFallback: true
     }]);
     const tabs = await chrome.tabs.query({});
     await Promise.allSettled(tabs.map(tab => chrome.scripting.executeScript({
-      target: { tabId: tab.id }, files: ["content.js"]
+      target: { tabId: tab.id, allFrames: true }, files: ["dyslexia.js", "selection-reader.js", "content.js"]
     })));
   }
 }

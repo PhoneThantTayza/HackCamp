@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { defaults, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import DyslexiaOptions from "./DyslexiaOptions.jsx";
+import { emptyDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: ["Larger text", "High contrast", "Extra line spacing", "Reduce motion", "Underline links"] },
@@ -52,20 +54,25 @@ function AccessibilityCard({ group, selected, onToggle }) {
 export default function App() {
   const [light, setLight] = useState(false);
   const [selected, setSelected] = useState([]);
+  const [dyslexia, setDyslexia] = useState(emptyDyslexia);
   const [enabled, setEnabled] = useState(true);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [speechReset, setSpeechReset] = useState(0);
   useEffect(() => { loadSettings().then(settings => {
-    setLight(settings.light); setSelected(settings.selected); setEnabled(settings.enabled); setReady(true);
+    setLight(settings.light); setSelected(settings.selected); setDyslexia(settings.dyslexia); setEnabled(settings.enabled); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
   function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); setStatus("Unsaved changes. Select Save and apply."); }
+  function changeDyslexia(value) { setDyslexia(value); setStatus("Unsaved changes. Select Save and apply."); }
+  const choiceCount = selected.length + dyslexiaChoiceCount(dyslexia);
   async function persist(reset = false) {
+    if (reset) setSpeechReset(value => value + 1);
     setBusy(true); setError(""); setStatus("");
     try {
-      await saveSettings(reset ? { ...defaults, light } : { version: 1, enabled, selected, light });
-      if (reset) { setSelected([]); setEnabled(true); }
+      await saveSettings(reset ? { ...defaults, light, dyslexia: emptyDyslexia() } : { version: 1, enabled, selected, light, dyslexia });
+      if (reset) { setSelected([]); setDyslexia(emptyDyslexia()); setEnabled(true); }
       setStatus(await applyToTarget());
     } catch (error) { setError(error.message); }
     finally { setBusy(false); }
@@ -94,8 +101,10 @@ export default function App() {
       <section className="accessibility-section" aria-labelledby="adjustments-title">
         <div className="flex items-center justify-between gap-3 mb-2"><h2 id="adjustments-title" className="text-sm font-medium">What would make browsing easier?</h2><span className="optional-tag">OPTIONAL</span></div>
         <p className="muted text-sm">Choose what works for you. You can mix and match.</p>
-        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} selected={selected} onToggle={toggle} />)}</fieldset>
-        <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{selected.length ? `${selected.length} adjustment${selected.length === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{selected.length > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={() => { setSelected([]); setStatus("Unsaved changes. Select Save and apply."); }}>Clear all</button>}</div>
+        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 items-start">{groups.map(group => group.id === "dyslexia"
+          ? <DyslexiaOptions key={group.id} value={dyslexia} onChange={changeDyslexia} enabled={ready && enabled} speechReset={speechReset} searchIcon={<Icon name="search" size={16} />} />
+          : <AccessibilityCard key={group.id} group={group} selected={selected} onToggle={toggle} />)}</fieldset>
+        <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{choiceCount ? `${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{choiceCount > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={() => { setSelected([]); setDyslexia(emptyDyslexia()); setStatus("Unsaved changes. Select Save and apply."); }}>Clear all</button>}</div>
       </section>
 
       <section className="extension-controls" aria-label="Extension controls">

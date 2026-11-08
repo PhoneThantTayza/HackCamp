@@ -34,7 +34,7 @@ test("page styles update without duplication and disable removes only our sheet"
 
 test("build contains the files referenced by the manifest", () => {
   const manifest = JSON.parse(readFileSync("dist/manifest.json", "utf8"));
-  for (const file of [manifest.options_page, manifest.background.service_worker, "content.js"]) {
+  for (const file of [manifest.options_page, manifest.background.service_worker, "dyslexia.js", "selection-reader.js", "selection-tts.js", "content.js"]) {
     assert.ok(readFileSync(`dist/${file}`).length);
   }
   assert.equal(manifest.manifest_version, 3);

@@ -1,10 +1,15 @@
 (() => {
   // Isolated-world guard prevents duplicate storage listeners on repeated Apply.
-  if (globalThis.clearspaceApply) {
+  if (globalThis.clearspaceApply?.version === 9) {
     chrome.storage.local.get("settings").then(({ settings }) => globalThis.clearspaceApply(settings));
     return;
   }
+  // Clean up an older engine before upgrading an already-open page.
+  if (globalThis.clearspaceApply) globalThis.clearspaceApply({ version: 1, enabled: false, selected: [] });
+  if (globalThis.clearspaceStorageListener) chrome.storage.onChanged.removeListener(globalThis.clearspaceStorageListener);
   let sheet;
+  const dyslexia = globalThis.clearspaceDyslexia?.createController(document);
+  const speech = globalThis.clearspaceSelectionReader?.createController(document, chrome);
   const rules = {
     "Larger text": "html { font-size: 125% !important; } body :where(p, li, input, textarea, button, label, td, th) { font-size: max(1.1rem, 18px) !important; }",
     "High contrast": "html, body, body :where(main, article, section, div, p, li, header, footer, nav, input, textarea, button, select) { background-color: #fff !important; color: #111 !important; } body a { color: #0033a0 !important; }",
@@ -22,16 +27,27 @@
   globalThis.clearspaceApply = settings => {
     if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter(item => item !== sheet);
     sheet = undefined;
+    dyslexia?.reset();
+    speech?.update(settings);
     if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) return;
-    const names = new Set(settings.selected.filter(item => typeof item === "string").map(item => item.split(":")[1]));
+    // Experience presets replace older dyslexia checkboxes when supplied.
+    const hasDyslexiaPreferences = settings.dyslexia && typeof settings.dyslexia === "object" && !Array.isArray(settings.dyslexia);
+    const names = new Set(settings.selected.filter(item => typeof item === "string" &&
+      !(hasDyslexiaPreferences && item.startsWith("dyslexia:"))).map(item => item.split(":")[1]));
     const css = [...names].map(name => rules[name] || "").join("\n");
-    if (!css) return;
-    sheet = new CSSStyleSheet();
-    sheet.replaceSync(css);
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    if (css) {
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    }
+    if (settings.dyslexia) dyslexia?.apply(settings.dyslexia, {
+      highContrast: names.has("High contrast"), extraLineSpacing: names.has("Extra line spacing")
+    });
   };
-  chrome.storage.onChanged.addListener((changes, area) => {
+  globalThis.clearspaceApply.version = 9;
+  globalThis.clearspaceStorageListener = (changes, area) => {
     if (area === "local" && changes.settings) globalThis.clearspaceApply(changes.settings.newValue);
-  });
+  };
+  chrome.storage.onChanged.addListener(globalThis.clearspaceStorageListener);
   chrome.storage.local.get("settings").then(({ settings }) => globalThis.clearspaceApply(settings));
 })();
