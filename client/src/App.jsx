@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { defaults, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
+import CombinedPreview from "./CombinedPreview.jsx";
 import DyslexiaSlider from './DyslexiaSlider.jsx';
 
 const groups = [
@@ -430,6 +431,8 @@ export default function App() {
         {choiceCount > 0 && <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{`${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.`}</span><button type="button" className="clear-button shrink-0" disabled={!ready} onClick={clearChoices}>Clear all</button></div>}
 
       </section>
+
+      {ready && <CombinedPreview settings={{ version: 1, enabled, selected, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia }} />}
 
       <section className="extension-controls" aria-label="Browsing controls">
         {!isExtension && <p className="optional-tag mb-4">LOCAL UI DEMO — does not adjust websites</p>}
