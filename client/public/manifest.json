@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Reversible reading and accessibility adjustments for webpages.",
   "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqD8xKo7Q7RU0xY0wzgC58Qrtt3LX/J2VZ1iCYoZnMVG9oEdGbYi4lLOdeO0ppgioqH6Unhma9w6ygObRZDUgBTR6i+fPk/mdhWaJiNUeT+LNwkuTZpbce1kgxRzNfNXC7tQyC1edUcdYPBTHgN3YNO5qoel6cL7fteVsjH0LkHQFSwN4vTsXVRU6DJpTSA2co94RT3gl5myzpIv2P733/ojAkZOyYD+io/nL8PEEYPqSeUNUWlHnxtEJ/Or+/WGAzgnyBVzAoRjzfok11dwG1sNb5ukQ1ZRNY3FM2p4a4MrB7Rf7+1++HN8RqMtEDlUt1y1vJgC9dSYZ2/wJ6GCQ4wIDAQAB",
   "permissions": ["storage", "activeTab", "scripting", "tts", "sidePanel", "identity"],
   "side_panel": { "default_path": "index.html?panel=1" },
   "optional_host_permissions": ["http://*/*", "https://*/*"],
