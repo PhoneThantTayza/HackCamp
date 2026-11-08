@@ -12,11 +12,15 @@ node --test tests/extension.test.js
 1. Open `chrome://extensions` in Chrome.
 2. Enable **Developer mode** at the top right.
 3. Click **Load unpacked**.
-4. Select `C:\Users\ton53\Desktop\HackCamp\dist` (the folder containing manifest.json).
+4. Select this project's `dist` folder (the folder containing manifest.json).
 5. Pin **Clearspace** using Chrome's puzzle-piece Extensions menu.
 6. Open a regular webpage, click the Clearspace toolbar icon, choose adjustments, then **Save and apply**. Return to the original tab to see changes.
 
 Click the icon again after navigating to another site. Opening the settings directly through Chrome has no original target tab. For automatic behavior, use **Allow automatic adjustments on websites** and accept Chrome's permission prompt. Saved preferences then apply to permitted existing tabs and new/navigated webpages. Review or revoke permissions in Chrome's extension **Details > Site access**. Refresh adjusted pages after revoking access to clear remaining styles.
+
+If the live colour sample changes but websites do not, first check that you opened Clearspace through its extension icon, rather than localhost. With automatic site access enabled, **Save and apply** also connects open websites when settings were opened directly. Success is reported only after a webpage confirms it received and applied the saved settings. After updating the extension, rebuild, reload its extension card and refresh the website before retrying.
+
+If applying still fails, the error includes Chrome's reason or the page script's error. A closed or navigated target requires reopening Clearspace from the target webpage's toolbar icon. Permission errors require granting access through that icon or the optional automatic-access control; local files also require **Allow access to file URLs** in Chrome's extension Details. Chrome settings and the Chrome Web Store are protected. For other errors, retain the full message and the failing webpage URL for diagnosis.
 
 Uncheck **Enable webpage adjustments**, then save to disable while remembering choices. **Reset adjustments** clears choices and removes styles from connected pages. The UI theme is separate from website appearance and is remembered on save.
 
@@ -26,7 +30,27 @@ After code changes, rebuild, click Reload on the extension card, refresh webpage
 
 ## Extension features and verification
 
-Implemented: larger text, high contrast, line/letter/button spacing, reduced CSS motion, link underlines, readable font, shorter text lines, left alignment, larger form/button targets and visible keyboard focus. Reading guide, simplified layout, distraction hiding, clear headings and shorter paragraphs are disabled and marked Coming later.
+### Colour blindness
+
+Open **Vision → Colour blindness**. Select a red–green palette (red/protan or green/deutan emphasis) or a blue–yellow palette (tritan), then adjust **Strength**. The labelled, shape-coded sample compares original colours with your current settings immediately, including in the local UI demo. Select **Save and apply** to adjust the original webpage.
+
+These are assistance palettes that redistribute colour channels, not deficiency simulations or clinically validated corrections. Neutral greys and opacity are preserved. Choose the palette and strength that help you; preferences vary. Whole-page colour remapping also affects images, videos, charts and canvas as rendered on supported pages. It does not inspect or label their contents. Existing page filters are temporarily overridden and root filtering can affect fixed-position layouts.
+
+**Use cues beyond colour** works independently of the palette: it underlines links, adds borders to form controls/buttons, adds visible keyboard focus and outlines fields that the website marks `aria-invalid="true"` with dashed lines. It cannot infer missing status labels or make arbitrary colour-only charts accessible.
+
+The palette, strength and cues are saved with the other preferences and shared with connected tabs. **Off** restores the original palette while leaving other adjustments available. **Clear all** clears the colour choices along with other selections; save to apply. Switching adjustments off and saving pauses effects without losing choices. **Reset choices** removes effects and resets the colour controls. Existing saved settings start with colour assistance off.
+
+After rebuilding, reload the extension and refresh existing webpages so they load the updated scripts. Manually check each palette at 0% and 100%, switch modes, reload settings, pause/resume and reset. Try dynamic page content, a page with its own SVG/filter styles, and combining the palette with cues beyond colour. Check keyboard operation of the select, slider and cue checkbox. Chrome visual rendering still needs a browser check; Node tests verify filter creation/replacement/removal, independent cues, neutral-colour preservation, malformed settings and packaging.
+
+### Low vision
+
+Open **Vision → Low vision** and select any combination of **Larger text and controls**, **Higher contrast**, **More visible links**, and **More visible keyboard focus**. Each option has a **Strength** slider (0–200%, in steps of 5) that updates its live sample. Save and apply remembers each strength and uses it on webpages. At 0%, that option has no effect; existing choices default to 100% to keep their current appearance. At 100% strength, larger text scales the page to 125%, increases control targets to at least 44px and adds readable line spacing. At the new 200% maximum, it scales the page to 150% with targets of at least 64px; link emphasis and focus outlines also become stronger. Higher contrast gradually adjusts text against its existing background instead of repainting the page. Link emphasis adds bold text, thick underlines and distinct link/visited colours. Keyboard focus uses a black outline with a white surround for visibility on light and dark surfaces.
+
+Select **Save and apply** to use these choices on connected webpages. With **Allow site access**, they also apply to existing and newly opened websites, just like colour blindness settings. Choices are remembered, can be combined with colour assistance, and follow the same pause, clear and reset controls. Styles also cover matching content added later. Fixed layouts may overlap when enlarged; embedded frames and shadow roots remain unsupported. Check actual rendering, keyboard focus and combinations on light/dark and dynamically updated pages after rebuilding and reloading the extension.
+
+Higher contrast preserves background colours, gradients, text shadows, native control themes and already-readable text. At 5%, it makes a small improvement toward 4.5:1 text contrast; at 100%, it aims for 4.5:1; at 200%, it aims for 7:1 where possible without changing the background. It does not claim every target is achievable. The same colour calculation powers the live sample. Changes are reversible, do not accumulate across strength updates, and are refreshed for dynamic content and theme changes. Simple sRGB gradients and transparent background layers are estimated; text over photos, complex gradients, gradient-filled letters and composited effects is left alone rather than guessing. Image, video, canvas, SVG and generated pseudo-element content are not recoloured. These estimates do not account for overlapping siblings or every browser paint effect.
+
+Other categories offer letter/button spacing, reduced CSS motion, readable font, shorter text lines, left alignment, larger form/button targets and visible keyboard focus. Reading guide, simplified layout, distraction hiding, clear headings and shorter paragraphs are disabled and marked Coming later.
 
 Styles are removable and cover matching dynamically inserted elements. They are best effort: fixed layouts can overlap, website styles can win, and reduced CSS motion does not stop videos or JavaScript effects. Embedded frames, closed shadow roots, canvas, PDFs, browser pages and protected sites are unsupported. No accessibility-compliance guarantee is made.
 
@@ -81,3 +105,9 @@ npm start
 The start command works in PowerShell and serves the built `dist` directory.
 Set the `PORT` environment variable to change the default port of 3000.
 `npm run dev:client` runs Vite alone and does not start the API.
+
+### Light sensitivity
+
+Open **Vision → Light sensitivity** to select **Dim page**, **Soften bright backgrounds**, **Warm colour tint**, and **Dark page theme**. The first three have independent 0–200% strength sliders; dark theme is an on/off choice. A live sample shows the combined result. **Save and apply** remembers your choices and applies them to webpages; pause or reset removes the effects.
+
+Dim page lowers content brightness by up to 50%, and warm tint applies a gentle sepia-based filter. Both include images and video and combine with colour assistance. Softening changes bright, nearly neutral solid backgrounds; dark theme uses dark surfaces and light text without inverting media. Dark theme takes precedence over softening when both are selected. These adjust webpage content rather than hardware screen brightness. Images used as backgrounds, embedded frames, and custom page styling can limit coverage.

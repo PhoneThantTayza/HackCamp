@@ -3,9 +3,9 @@
 :root { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-synthesis: none; text-rendering: optimizeLegibility; background: #111111; }
 * { box-sizing: border-box; }
 body { margin: 0; }
-button, input, a { -webkit-tap-highlight-color: transparent; }
-button, a, input { outline-offset: 5px; }
-button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--text); }
+button, input, select, a { -webkit-tap-highlight-color: transparent; }
+button, a, input, select { outline-offset: 5px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--text); }
 button { cursor: pointer; }
 .app { --bg: #111111; --surface: #191919; --hover: #222222; --border: #303030; --text: #eeeeee; --muted: #a2a2a2; --button: #eeeeee; --button-text: #171717; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; color-scheme: dark; }
 .app.light { --bg: #fafaf9; --surface: #ffffff; --hover: #f0f0ee; --border: #dededb; --text: #202020; --muted: #666663; --button: #222222; --button-text: #ffffff; color-scheme: light; }
@@ -84,6 +84,40 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .controls-feedback { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; line-height: 1.7; margin-top: 14px; }
 @media (max-width: 480px) { .browsing-controls { padding: 18px; } .controls-heading { gap: 12px; } .automatic-access .secondary-button { width: 100%; } }
 
+.colour-controls { padding-top: 6px; }
+.low-vision-controls { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px; }
+.colour-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0; }
+.colour-label { display: block; font-size: 12px; margin: 14px 0 8px; }
+.colour-select { width: 100%; min-height: 44px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px; font: inherit; font-size: 12px; }
+.colour-strength { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; margin: 18px 0 8px; }
+.colour-range { width: 100%; min-height: 28px; accent-color: var(--text); }
+.colour-preview { border: 1px solid var(--border); border-radius: 10px; padding: 0 12px 12px; }
+.colour-filter-defs { position: absolute; pointer-events: none; }
+.colour-sample-row { margin-top: 12px; font-size: 11px; }
+.colour-swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8x; }
+.colour-swatch { min-width: 0; text-align: center; }
+.colour-swatch > span { display: grid; place-items: center; min-height: 32px; border-radius: 5px; color: #fff; font-size: 16px; text-shadow: 0 1px 3px #000; }
+.colour-swatch small { display: block; color: var(--text); font-size: 10px; margin-top: 5px; }
+.low-vision-option + .low-vision-option { margin-top: 18px; }
+.low-vision-sample { margin-top: 8px; padding: 14px; border-radius: 6px; background: #f3f4f6; color: #555; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.low-vision-sample p { margin: 0; }
+.low-vision-sample button { display: inline-block; max-width: 100%; margin-top: 10px; border: 1px solid #9ca3af; border-radius: 4px; padding: 6px 10px; background: #e5e7eb; color: inherit; font: inherit; }
+.low-vision-sample a { color: #2463a6; text-decoration: underline; }
+.low-vision-sample button:focus-visible, .low-vision-sample a:focus-visible { outline: 2px solid #005fcc; outline-offset: 3px; }
+.low-vision-sample-size.is-adjusted { font-size: calc(12px * var(--low-zoom)); line-height: var(--low-line-height); }
+.low-vision-sample-size.is-adjusted button { min-height: var(--low-target); min-width: var(--low-target); padding: calc(6px * var(--low-zoom)) calc(10px * var(--low-zoom)); }
+.low-vision-sample-contrast .contrast-muted { color: #9097a2; margin-top: 6px; }
+.low-vision-sample-links.is-adjusted a { color: #003c8f; background: #fff; font-weight: var(--low-weight); text-decoration-thickness: var(--low-underline); text-underline-offset: var(--low-offset); }
+.low-vision-sample-focus { padding: 22px; }
+.low-vision-sample-focus button { margin-top: 0; }
+.low-vision-sample-focus.is-adjusted .sample-focus-target { outline: var(--low-outline) solid #000; outline-offset: var(--low-outline); box-shadow: 0 0 0 var(--low-ring) #fff; }
+
+.light-sensitivity-sample { margin-top: 8px; padding: 14px; border-radius: 6px; background: #fff; color: #30343b; font-size: 12px; line-height: 1.6; }
+.light-sensitivity-sample p { margin: 0 0 6px; }
+.light-sensitivity-sample a { color: #2463a6; text-decoration: underline; }
+.light-sensitivity-sample button { display: block; margin-top: 10px; padding: 6px 10px; border: 1px solid #9ca3af; border-radius: 4px; background: #f3f4f6; color: #30343b; font: inherit; }
+
+.dyslexia-controls { padding-top: 6px; }
 .dyslexia-card { min-width: 0; }
 .dyslexia-search-button { color: var(--muted); background: transparent; border: 0; font-size: 11px; min-height: 33px; padding: 4px; }
 .dyslexia-section { border: 0; border-top: 1px solid var(--border); padding: 12px 0; margin: 0; min-width: 0; }

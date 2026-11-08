@@ -25,7 +25,12 @@
       if (typeof custom[key] === 'number' && Number.isFinite(custom[key])) result[key] = Math.min(max, Math.max(min, custom[key]));
     }
     if (color(custom.guideColor)) result.guideColor = custom.guideColor;
-    for (const key of ['guide', 'alignStart', 'wordHighlight', 'focusParagraph', 'allTextContrast']) if (typeof custom[key] === 'boolean') result[key] = custom[key];
+    for (const key of ['guide', 'alignStart', 'wordHighlight', 'focusParagraph', 'allTextContrast']) {
+      const value = custom[key];
+      if (typeof value === 'boolean') result[key] = value;
+      else if (value === 'true') result[key] = true;
+      else if (value === 'false') result[key] = false;
+    }
     const warnings = [];
     if (context.extraLineSpacing === true) result.lineHeight = Math.max(1.8, result.lineHeight ?? 0);
     const needsSeparateEngine = [];
