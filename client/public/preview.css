@@ -1,0 +1,26 @@
+html { background: #fff; color: #30343b; scroll-behavior: smooth; }
+body { margin: 0; font: 15px/1.6 Georgia, serif; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 18px 24px; background: #f4f6f8; }
+.site-name { font-weight: bold; }
+nav { display: flex; gap: 18px; }
+a { color: #2463a6; }
+main { padding: 24px; }
+h1 { font-size: 28px; line-height: 1.25; }
+h2 { font-size: 20px; }
+p { margin: 0 0 16px; }
+.eyebrow { font: 11px/1.5 Arial, sans-serif; letter-spacing: .1em; }
+.subtle { color: #9097a2; }
+.ad-banner, aside { padding: 12px 24px; background: #f0e8d9; font-size: 13px; }
+aside { margin: 18px 0; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.swatches span { padding: 8px 12px; color: #fff; border-radius: 5px; font: 13px Arial, sans-serif; }
+.red { background: #d53b35; } .green { background: #27834a; } .blue { background: #246fce; } .swatches .yellow { background: #e5b52e; color: #222; }
+.motion-track { display: flex; align-items: center; gap: 28px; margin: 24px 0; font-size: 13px; }
+.moving-dot { display: inline-block; flex: 0 0 12px; height: 12px; border-radius: 50%; background: #246fce; animation: drift 1.8s ease-in-out infinite alternate; }
+@keyframes drift { to { transform: translateX(18px); } }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+button, input { font: 13px Arial, sans-serif; }
+button { border: 1px solid #9ca3af; border-radius: 5px; padding: 7px 10px; color: #30343b; background: #f3f4f6; cursor: pointer; }
+label { display: block; margin-top: 16px; }
+input[type=text] { display: block; max-width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #9ca3af; }
+#sample-result { margin-top: 16px; }

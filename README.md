@@ -30,6 +30,12 @@ After code changes, rebuild, click Reload on the extension card, refresh webpage
 
 ## Extension features and verification
 
+### Combined live preview
+
+**Preview all adjustments** shows all current choices together on an interactive sample webpage, before saving. It uses the same page adjustment scripts for vision, dyslexia, motor controls, motion and distraction hiding. Try buttons, links, keyboard focus, text selection and pointer reading tools inside the preview. Listening uses the browser's available speech voices. Draft changes stay inside the preview; **Save and apply** updates connected websites. Pause, Clear all and Reset choices also update the preview.
+
+Run `npm run build` and `node tests/preview.browser.mjs` for the Chrome integration check. Set `A11YFIX_PLAYWRIGHT` to a local playwright-core `index.mjs` and `A11YFIX_CHROME` to your Chrome executable when needed.
+
 ### Colour blindness
 
 Open **Vision → Colour blindness**. Select a red–green palette (red/protan or green/deutan emphasis) or a blue–yellow palette (tritan), then adjust **Strength**. The labelled, shape-coded sample compares original colours with your current settings immediately, including in the local UI demo. Select **Save and apply** to adjust the original webpage.

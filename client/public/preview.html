@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clearspace combined preview</title>
+  <link rel="stylesheet" href="preview.css">
+  <script src="preview.js" defer></script>
+  <script src="color-vision.js" defer></script>
+  <script src="low-vision.js" defer></script>
+  <script src="light-sensitivity.js" defer></script>
+  <script src="focus-mode.js" defer></script>
+  <script src="dyslexia.js" defer></script>
+  <script src="selection-reader.js" defer></script>
+  <script src="content.js" defer></script>
+  <script src="motion-main.js" defer></script>
+  <script src="motion.js" defer></script>
+  <script src="click-targets.js" defer></script>
+  <script src="button-spacing.js" defer></script>
+  <script src="keyboard-focus.js" defer></script>
+</head>
+<body>
+  <header><span class="site-name">Everyday reading</span><nav aria-label="Sample navigation"><a href="#story">Read</a><a href="#try-controls">Explore</a></nav></header>
+  <div class="ad-banner" aria-label="Advertisement">Advertisement · A little extra noise in your day.</div>
+  <main id="story">
+    <p class="eyebrow">A MOMENT FOR YOURSELF</p>
+    <h1>Make room for a calmer day.</h1>
+    <p id="preview-reading">Small changes can make everyday reading feel more comfortable. Take your time with this passage, follow a line at your own pace, and explore the ideas that catch your attention.</p>
+    <p>You can <a href="#try-controls">explore the sample controls</a> or select a few words to try listening. A comfortable reading space leaves room to pause, notice something new, and return when you are ready.</p>
+    <p class="subtle">Even the quieter details deserve to be easy to read.</p>
+    <div class="swatches" aria-label="Colour examples"><span class="red">● Red</span><span class="green">▲ Green</span><span class="blue">■ Blue</span><span class="yellow">◆ Yellow</span></div>
+    <div class="motion-track" aria-label="Moving sample"><span class="moving-dot"></span><span>A little movement to try Reduce motion.</span></div>
+    <aside>Related stories · A sidebar that disappears with Hide distractions.</aside>
+    <section id="try-controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">Try it for yourself</h2>
+      <p>Tab through these controls to check focus visibility and spacing.</p>
+      <div class="buttons"><button type="button" id="sample-button">Try a button</button><button type="button" id="sample-reset">Reset sample</button></div>
+      <label>Your notes <input type="text" placeholder="Write a little here"></label>
+      <label><input type="checkbox"> Keep a little room for a break</label>
+      <p id="sample-result" role="status">Your sample is ready.</p>
+    </section>
+  </main>
+</body>
+</html>
