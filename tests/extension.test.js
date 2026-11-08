@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 test("adaptive contrast is gradual, preserves readable colours and respects light/dark backgrounds", () => {
   const context = vm.createContext({});
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   const { improveText, parseColor, contrast, rules } = context.clearspaceLowVision;
   const white = [255, 255, 255], dark = [25, 35, 44];
   const muted = [150, 150, 150, 1];
@@ -42,6 +43,7 @@ test("page styles update without duplication and disable removes only our sheet"
   const source = readFileSync("client/public/content.js", "utf8");
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   assert.equal(document.adoptedStyleSheets.length, 2);
@@ -70,7 +72,7 @@ test("page styles update without duplication and disable removes only our sheet"
 
 test("build contains the files referenced by the manifest", () => {
   const manifest = JSON.parse(readFileSync("dist/manifest.json", "utf8"));
-  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "content.js"]) {
+  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]) {
     assert.ok(readFileSync(`dist/${file}`).length);
   }
   assert.equal(manifest.manifest_version, 3);
@@ -85,17 +87,20 @@ test("low vision choices persist while obsolete vision choices are ignored", asy
   });
   let stored;
   globalThis.localStorage = { getItem: () => stored ?? null, setItem: (_, value) => { stored = value; } };
-  const { loadSettings, saveSettings, defaults, lowVisionOptions } = await import("../client/src/settings.js?low-vision-test");
+  const { loadSettings, saveSettings, defaults, lowVisionOptions, lightSensitivityOptions } = await import("../client/src/settings.js?low-vision-test");
   assert.deepEqual((await loadSettings()).selected, []);
-  const selected = lowVisionOptions.map(option => `vision:${option}`);
+  const selected = [...lowVisionOptions, ...lightSensitivityOptions].map(option => `vision:${option}`);
   const lowVision = Object.fromEntries(lowVisionOptions.map((option, index) => [option, 125 + index * 25]));
-  await saveSettings({ ...defaults, selected, lowVision });
+  const lightSensitivity = { "Dim page": 25, "Soften bright backgrounds": 70, "Warm colour tint": 60 };
+  await saveSettings({ ...defaults, selected, lowVision, lightSensitivity });
+  assert.deepEqual((await loadSettings()).lightSensitivity, lightSensitivity);
   assert.deepEqual((await loadSettings()).lowVision, lowVision);
   await saveSettings({ ...defaults, selected: [...selected, "vision:Larger text", "vision:High contrast", "motor:Reduce motion"] });
   assert.deepEqual((await loadSettings()).selected, [...selected, "motor:Reduce motion"]);
   await saveSettings(defaults);
   assert.deepEqual((await loadSettings()).selected, []);
   assert.deepEqual((await loadSettings()).lowVision, defaults.lowVision);
+  assert.deepEqual((await loadSettings()).lightSensitivity, defaults.lightSensitivity);
 });
 
 test("low vision updates independently, restores website styles and combines with colour assistance", async () => {
@@ -111,6 +116,7 @@ test("low vision updates independently, restores website styles and combines wit
   } });
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   const source = readFileSync("client/public/content.js", "utf8");
   await vm.runInContext(source, context);
   const css = document.adoptedStyleSheets[1].css;
@@ -187,6 +193,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   const source = readFileSync("client/public/content.js", "utf8");
   vm.runInContext(helper, context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   function assertActive(mode, strength) {
@@ -205,6 +212,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   // The same scripts are injected every time the user applies to this tab.
   vm.runInContext(helper, context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   assertActive("protan", 70);
@@ -213,6 +221,11 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   apply({ ...settings, colorVision: { mode: "tritan", strength: 35, cues: false } });
   assertActive("tritan", 35);
   assert.doesNotMatch(document.adoptedStyleSheets[1].css, /dashed/);
+  apply({ ...settings, selected: [...settings.selected, "vision:Dim page", "vision:Warm colour tint"], lightSensitivity: { "Dim page": 100, "Warm colour tint": 100 } });
+  assertActive("protan", 70);
+  assert.match(document.adoptedStyleSheets[1].css, /filter: url\([^\n]+ brightness\(0.5\) sepia\(0.35\) saturate\(1.2\)/);
+  apply({ ...settings, colorVision: { mode: "off" }, selected: ["vision:Dim page"], lightSensitivity: { "Dim page": 0 } });
+  assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
   apply({ ...settings, enabled: false });
   assert.deepEqual(root.children, [websiteSvg]);
   assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
@@ -231,6 +244,7 @@ test("colour palettes preserve neutral colours and opacity; zero strength is ide
   const context = vm.createContext({});
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   const { normalize, matrix } = context.clearspaceColorVision;
   const identity = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0";
   for (const mode of ["protan", "deutan", "tritan"]) {
@@ -265,6 +279,7 @@ test("content injection acknowledges application and reports asynchronous failur
   });
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   const source = readFileSync("client/public/content.js", "utf8");
   const failure = await vm.runInContext(source, context);
   assert.equal(failure.applied, false);
@@ -315,7 +330,7 @@ test("Save connects open websites with automatic access and requires a page ackn
   const { applyToTarget } = await import("../client/src/settings.js?extension-test");
   assert.match(await applyToTarget(), /applied to 1 website tab/);
   assert.deepEqual(injected.filter(item => item.files).map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(injected[0].files, ["color-vision.js", "low-vision.js", "content.js"]);
+  assert.deepEqual(injected[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]);
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
   automatic = false;
@@ -354,4 +369,62 @@ test("Save connects open websites with automatic access and requires a page ackn
   globalThis.chrome.tabs.query = async () => [];
   globalThis.location.search = "";
   assert.match(await applyToTarget(), /Open a website/);
+});
+
+test("light sensitivity keeps coloured and dark surfaces, clamps strengths and restores inline styles", () => {
+  const context = vm.createContext({});
+  vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
+  const { normalize, filters, surface, applySurfaces } = context.clearspaceLightSensitivity;
+  assert.equal(normalize({ "Dim page": -10 })["Dim page"], 0);
+  assert.equal(normalize({ "Warm colour tint": 400 })["Warm colour tint"], 100);
+  assert.equal(normalize({ "Dim page": NaN })["Dim page"], 35);
+  assert.equal(filters([], {}), '');
+  assert.equal(filters(['Dim page', 'Warm colour tint'], { 'Dim page': 0, 'Warm colour tint': 0 }), '');
+  assert.equal(surface([255, 255, 255, 1], 100, false), 'rgba(222, 218, 208, 1)');
+  assert.equal(surface([255, 255, 255, 1], 0, false), null);
+  assert.equal(surface([25, 30, 35, 1], 100, false), null);
+  assert.equal(surface([255, 0, 0, 1], 100, false), null);
+  assert.equal(surface([0, 0, 0, 0], 100, true), null);
+
+  const makeNode = (background, tag = 'div') => {
+    const values = new Map(), priorities = new Map();
+    return { background, tag, style: {
+      getPropertyValue: key => values.get(key) || '',
+      getPropertyPriority: key => priorities.get(key) || '',
+      setProperty: (key, value, priority) => { values.set(key, value); priorities.set(key, priority); },
+      removeProperty: key => { values.delete(key); priorities.delete(key); },
+    }, closest: () => tag === 'img', matches: selector => tag === 'a' && selector.includes('a[href]') };
+  };
+  const root = makeNode('rgb(255, 255, 255)'), link = makeNode('rgba(0, 0, 0, 0)', 'a'), image = makeNode('rgb(255, 255, 255)', 'img');
+  let children = [link, image], callback, disconnected = 0, scheduled;
+  const document = { documentElement: root, defaultView: {
+    getComputedStyle: node => ({ backgroundColor: node.style.getPropertyValue('background-color') || node.background,
+      color: 'rgb(30, 30, 30)', webkitTextFillColor: 'rgb(30, 30, 30)', backgroundImage: 'none' }),
+    MutationObserver: class { constructor(fn) { callback = fn; } disconnect() { disconnected++; } observe() {} },
+    setTimeout: fn => { scheduled = fn; return 1; }, clearTimeout() { scheduled = undefined; },
+  } };
+  for (const node of [root, link, image]) node.ownerDocument = document;
+  root.querySelectorAll = () => children;
+  root.style.setProperty('background-color', 'rgb(255, 255, 255)', '');
+  let restore = applySurfaces(root, ['Soften bright backgrounds'], { 'Soften bright backgrounds': 100 });
+  assert.equal(root.style.getPropertyValue('background-color'), 'rgba(222, 218, 208, 1)');
+  restore();
+  assert.equal(root.style.getPropertyValue('background-color'), 'rgb(255, 255, 255)');
+  assert.equal(root.style.getPropertyPriority('background-color'), '');
+  restore = applySurfaces(root, ['Dark page theme'], {});
+  assert.equal(root.style.getPropertyValue('background-color'), 'rgba(30, 34, 40, 1)');
+  assert.equal(link.style.getPropertyValue('color'), '#9cc9ff');
+  assert.equal(image.style.getPropertyValue('color'), '');
+  const added = makeNode('rgb(255, 255, 255)');
+  added.ownerDocument = document;
+  children.push(added);
+  callback(); scheduled();
+  assert.equal(added.style.getPropertyValue('background-color'), 'rgba(30, 34, 40, 1)');
+  link.style.setProperty('color', 'red', ''); // Preserve a site's later inline change.
+  restore();
+  assert.equal(link.style.getPropertyValue('color'), 'red');
+  assert.equal(root.style.getPropertyValue('background-color'), 'rgb(255, 255, 255)');
+  assert.equal(added.style.getPropertyValue('color'), '');
+  assert.ok(disconnected > 0);
 });

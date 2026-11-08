@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { defaults, colorVision, lowVision, lowVisionOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import { defaults, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
@@ -110,14 +110,61 @@ function LowVisionControls({ selected, onToggle, enabled, strengths, onStrengthC
   </div>;
 }
 
-function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange }) {
+function LightSensitivitySample({ option, strengths, enabled }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (enabled) return lightSensitivity.applySurfaces(ref.current, [option], strengths);
+  }, [option, strengths, enabled]);
+  return <div className="colour-preview">
+    <p className="colour-label">Live sample{!enabled && " · adjustments paused"}</p>
+    {[false, true].map(adjusted => <div key={String(adjusted)} className="colour-sample-row">
+      <span className="muted">{adjusted ? "Your settings" : "Original"}</span>
+      <div ref={adjusted ? ref : undefined} className="light-sensitivity-sample" style={{ filter: adjusted && enabled ? lightSensitivity.filters([option], strengths) : undefined }}>
+        <p>A softer space to browse.</p><p>Read a little, explore a little.</p>
+        <a href="#light-sensitivity-options" onClick={event => event.preventDefault()}>Sample link</a>
+        <button type="button">Sample control</button>
+      </div>
+    </div>)}
+  </div>;
+}
+
+function LightSensitivityControls({ selected, onToggle, enabled, strengths, onStrengthChange }) {
+  const [open, setOpen] = useState(false);
+  const active = lightSensitivityOptions.filter(option => selected.includes(`vision:${option}`));
+  const descriptions = [
+    "Lower the brightness of the webpage, including images and videos.",
+    "Replace bright, nearly white surfaces with softer neutral shades.",
+    "Give the page a gentle warm tint, including images and videos.",
+    "Use dark page surfaces and light text while keeping images in their original colours.",
+  ];
+  return <div className="low-vision-controls">
+    <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls="light-sensitivity-options" onClick={() => setOpen(!open)}><span>Light sensitivity</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
+    <div id="light-sensitivity-options" hidden={!open}>
+      <p className="muted control-description">Choose a comfortable level of light and warmth for your webpages.</p>
+      {lightSensitivityOptions.map((option, index) => <div key={option} className="low-vision-option">
+        <label className="option-row"><input type="checkbox" checked={active.includes(option)} onChange={() => onToggle(`vision:${option}`)} /><span>{option}<small className="muted block">{descriptions[index]}</small></span></label>
+        {active.includes(option) && <>
+        {option !== "Dark page theme" && <>
+          <div className="colour-strength"><label htmlFor={`light-strength-${index}`}>Strength<span className="sr-only"> for {option}</span></label><output htmlFor={`light-strength-${index}`}>{strengths[option]}%</output></div>
+          <input id={`light-strength-${index}`} className="colour-range" type="range" min="0" max="100" step="5" value={strengths[option]} onChange={event => onStrengthChange({ ...strengths, [option]: Number(event.target.value) })} />
+        </>}
+        <LightSensitivitySample option={option} strengths={strengths} enabled={enabled} />
+        </>}
+      </div>)}
+      <p className="muted control-caption">Samples update now; save to apply to your webpage. Dim page adjusts webpage content, not your screen brightness. Website styling can affect results.</p>
+    </div>
+  </div>;
+}
+
+function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange, lightStrengths, onLightChange }) {
   const [open, setOpen] = useState(group.id === "vision");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const count = group.options.filter(option => selected.includes(`${group.id}:${option}`)).length + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + lowVisionOptions.filter(option => selected.includes(`vision:${option}`)).length : 0);
+  const count = group.options.filter(option => selected.includes(`${group.id}:${option}`)).length + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0);
   const options = group.options.filter(option => option.toLowerCase().includes(query.toLowerCase()));
   const showColour = group.id === "vision" && "colour color blindness protan deutan tritan red green blue yellow strength cues".includes(query.toLowerCase());
   const showLowVision = group.id === "vision" && `low vision strength ${lowVisionOptions.join(" ")}`.toLowerCase().includes(query.toLowerCase());
+  const showLight = group.id === "vision" && `light sensitivity brightness dim page soften bright backgrounds warm colour color tint dark page theme strength`.includes(query.toLowerCase());
   return <section className={`choice-card ${open ? "is-open" : ""}`}>
     <div className="flex items-start justify-between gap-2">
       <span className="category-icon"><Icon name={group.icon} size={23} /></span>
@@ -126,13 +173,14 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
     <button type="button" className="category-button" aria-expanded={open} aria-controls={`${group.id}-options`} onClick={() => setOpen(!open)}>
       <span className="flex items-center justify-between gap-2"><span className="text-base font-medium">{group.name}</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></span>
       <span className="muted mt-2 block text-xs">{group.description}</span>
-      <span className="muted mt-5 block text-xs">{count ? `${count} selected` : `${group.id === "vision" ? 2 : group.options.length} adjustments`}</span>
+      <span className="muted mt-5 block text-xs">{count ? `${count} selected` : `${group.id === "vision" ? 3 : group.options.length} adjustments`}</span>
     </button>
     {open && <div id={`${group.id}-options`} className="options-list">
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
       {options.map(option => <label key={option} className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>)}
-      {!options.length && !showColour && !showLowVision && <p className="muted text-xs py-2">No matching adjustments.</p>}
+      {!options.length && !showColour && !showLowVision && !showLight && <p className="muted text-xs py-2">No matching adjustments.</p>}
       {showColour && <ColourVisionControls value={colour} onChange={onColourChange} enabled={enabled} />}
+      {showLight && <LightSensitivityControls selected={selected} onToggle={onToggle} enabled={enabled} strengths={lightStrengths} onStrengthChange={onLightChange} />}
       {showLowVision && <LowVisionControls strengths={lowVisionStrengths} onStrengthChange={onLowVisionChange} selected={selected} onToggle={onToggle} enabled={enabled} />}
     </div>}
   </section>;
@@ -144,23 +192,25 @@ export default function App() {
   const [enabled, setEnabled] = useState(true);
   const [colour, setColour] = useState(defaults.colorVision);
   const [lowVisionStrengths, setLowVisionStrengths] = useState(defaults.lowVision);
+  const [lightStrengths, setLightStrengths] = useState(defaults.lightSensitivity);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   useEffect(() => { loadSettings().then(settings => {
-    setLight(settings.light); setSelected(settings.selected); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setReady(true);
+    setLight(settings.light); setSelected(settings.selected); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
   function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); setStatus("Unsaved changes. Select Save and apply."); }
   function changeColour(value) { setColour(value); setStatus("Unsaved changes. Select Save and apply."); }
   function changeLowVision(value) { setLowVisionStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function clearChoices() { setSelected([]); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setStatus("Unsaved changes. Select Save and apply."); }
+  function changeLight(value) { setLightStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
+  function clearChoices() { setSelected([]); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setStatus("Unsaved changes. Select Save and apply."); }
   const selectionCount = selected.length + Number(colour.mode !== "off") + Number(colour.cues);
   async function persist(reset = false) {
     setBusy(true); setError(""); setStatus("");
     try {
-      await saveSettings(reset ? { ...defaults, light } : { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths });
-      if (reset) { setSelected([]); setEnabled(true); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); }
+      await saveSettings(reset ? { ...defaults, light } : { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths });
+      if (reset) { setSelected([]); setEnabled(true); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); }
       setStatus(await applyToTarget());
     } catch (error) { setError(error.message); }
     finally { setBusy(false); }
@@ -190,7 +240,7 @@ export default function App() {
       <section className="accessibility-section" aria-labelledby="adjustments-title">
         <div className="flex items-center justify-between gap-3 mb-2"><h2 id="adjustments-title" className="text-sm font-medium">What would make browsing easier?</h2><span className="optional-tag">OPTIONAL</span></div>
         <p className="muted text-sm">Choose what works for you. You can mix and match.</p>
-        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} enabled={enabled} />)}</fieldset>
+        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} enabled={enabled} />)}</fieldset>
         <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{selectionCount ? `${selectionCount} adjustment${selectionCount === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{selectionCount > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={clearChoices}>Clear all</button>}</div>
       </section>
 

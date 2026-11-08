@@ -105,3 +105,9 @@ npm start
 The start command works in PowerShell and serves the built `dist` directory.
 Set the `PORT` environment variable to change the default port of 3000.
 `npm run dev:client` runs Vite alone and does not start the API.
+
+### Light sensitivity
+
+Open **Vision → Light sensitivity** to select **Dim page**, **Soften bright backgrounds**, **Warm colour tint**, and **Dark page theme**. The first three have independent 0–100% strength sliders; dark theme is an on/off choice. A live sample shows the combined result. **Save and apply** remembers your choices and applies them to webpages; pause or reset removes the effects.
+
+Dim page lowers content brightness by up to 50%, and warm tint applies a gentle sepia-based filter. Both include images and video and combine with colour assistance. Softening changes bright, nearly neutral solid backgrounds; dark theme uses dark surfaces and light text without inverting media. Dark theme takes precedence over softening when both are selected. These adjust webpage content rather than hardware screen brightness. Images used as backgrounds, embedded frames, and custom page styling can limit coverage.

@@ -10,11 +10,11 @@ async function syncAutomaticAccess() {
   if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: ["clearspace-auto"] });
   if (granted) {
     await chrome.scripting.registerContentScripts([{
-      id: "clearspace-auto", matches: origins, js: ["color-vision.js", "low-vision.js", "content.js"], runAt: "document_idle"
+      id: "clearspace-auto", matches: origins, js: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"], runAt: "document_idle"
     }]);
     const tabs = await chrome.tabs.query({});
     await Promise.allSettled(tabs.map(tab => chrome.scripting.executeScript({
-      target: { tabId: tab.id }, files: ["color-vision.js", "low-vision.js", "content.js"]
+      target: { tabId: tab.id }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]
     })));
   }
 }
