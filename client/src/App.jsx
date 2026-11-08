@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, isFirefox, extensionApi, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
 import CombinedPreview from "./CombinedPreview.jsx";
@@ -497,7 +497,16 @@ export default function App() {
     });
   }, [ready, enabled, selected, light, colour, lowVisionStrengths, lightStrengths, focusSettings, dyslexia, motorSettings]);
   function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); }
-  function changeDyslexia(value) { const customization = { ...value.customization }; delete customization.guide; setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode')); }
+  async function changeDyslexia(value) {
+    if (isFirefox && value.experiences.unfamiliarWords === true && !dyslexia.experiences.unfamiliarWords) {
+      try {
+        const granted = await extensionApi.permissions.request({ data_collection: ['websiteContent'] });
+        if (!granted) { setError('Word lookup stays off. It needs your permission to send selected words to Google.'); return; }
+      } catch { setError('Firefox could not request word lookup permission. Update Firefox and try again.'); return; }
+    }
+    const customization = { ...value.customization }; delete customization.guide;
+    setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode'));
+  }
   function changeColour(value) { setColour(value); }
   function changeMotor(value) { setMotorSettings(value); }
   function changeLowVision(value) { setLowVisionStrengths(value); }
@@ -510,7 +519,7 @@ export default function App() {
   async function allowAutomatic() {
     setError("");
     try {
-      const granted = await chrome.permissions.request({ origins: ["http://*/*", "https://*/*"] });
+      const granted = await extensionApi.permissions.request({ origins: ["http://*/*", "https://*/*"] });
       setStatus(granted ? "Site access granted. Saved settings will apply automatically on permitted webpages." : "Site access declined. Use the extension icon on individual webpages.");
     } catch (error) { setError(error.message); }
   }
@@ -552,7 +561,7 @@ export default function App() {
             <div className="automatic-copy"><h3 className="text-sm font-medium">Apply automatically as you browse</h3><p className="muted control-description">Allow site access to apply your saved adjustments to existing and newly opened websites. This is optional.</p></div>
             <button type="button" className="secondary-button" disabled={!ready} onClick={allowAutomatic}>Allow site access<Icon name="arrow" size={15} /></button>
           </div>}
-          {isExtension && <details className="controls-help muted"><summary>How does site access work?</summary><p>To adjust one website, open it and click the Accessify toolbar icon. To apply your choices automatically across websites, select Allow site access and accept Chrome's permission prompt. Chrome settings and other protected pages cannot be adjusted. You can review or revoke access in Chrome's Extensions → Accessify → Details → Site access. Refresh adjusted pages after revoking access to remove any remaining effects.</p></details>}
+          {isExtension && <details className="controls-help muted"><summary>How does site access work?</summary><p>To adjust one website, open it and click the Accessify toolbar icon. To apply your choices automatically across websites, select Allow site access and accept your browser's permission prompt. Browser settings and other protected pages cannot be adjusted. {isFirefox ? 'Review or revoke access in about:addons → Accessify → Permissions.' : "Review or revoke access in Chrome's Extensions → Accessify → Details → Site access."} Refresh adjusted pages after revoking access to remove any remaining effects.</p></details>}
         </div>
         <p role="status" className={status ? "controls-feedback text-sm" : ""}>{status}</p>
         {error && <p role="alert" className="controls-feedback text-sm">{error}</p>}

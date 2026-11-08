@@ -8,6 +8,8 @@
     "dev:server": "nodemon --watch server server/server.js",
     "dev": "npm run dev:server",
     "build": "vite build",
+    "build:chrome": "vite build",
+    "build:firefox": "vite build --mode firefox",
     "start": "node server/server.js --production"
   },
   "dependencies": {

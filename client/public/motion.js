@@ -10,7 +10,7 @@
 // Turning it OFF puts everything back.
 
 (() => {
-const storage = (globalThis.clearspacePreviewApi ?? globalThis.chrome)?.storage;
+const storage = (globalThis.clearspacePreviewApi ?? globalThis.browser ?? globalThis.chrome)?.storage;
 if (!storage?.local?.get || !storage?.onChanged?.addListener) {
   return { applied: false, error: "Extension storage is unavailable. Reload Clearspace and refresh this webpage." };
 }

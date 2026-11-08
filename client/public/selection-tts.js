@@ -1,5 +1,7 @@
 // Service-worker speech coordinator. Text stays in memory and uses local voices only.
 (() => {
+  const chrome = globalThis.browser ?? globalThis.chrome;
+  const speech = globalThis.clearspaceSpeech ?? chrome.tts;
   let generation = 0, owner;
   const samePage = sender => owner && sender.tab?.id === owner.tabId &&
     (owner.documentId ? sender.documentId === owner.documentId : sender.frameId === owner.frameId);
@@ -21,14 +23,14 @@
     return '';
   }
   async function localVoices() {
-    const get = async () => (await chrome.tts.getVoices()).filter(voice => voice.remote === false);
+    const get = async () => (await speech.getVoices()).filter(voice => voice.remote === false);
     let voices = await get();
-    if (voices.length || !chrome.tts.onVoicesChanged) return voices;
+    if (voices.length || !speech.onVoicesChanged) return voices;
     // Chrome can return [] while the platform voice list is still loading.
     await new Promise(resolve => {
-      const done = () => { clearTimeout(timer); chrome.tts.onVoicesChanged.removeListener(done); resolve(); };
+      const done = () => { clearTimeout(timer); speech.onVoicesChanged.removeListener(done); resolve(); };
       const timer = setTimeout(done, 1500);
-      chrome.tts.onVoicesChanged.addListener(done);
+      speech.onVoicesChanged.addListener(done);
     });
     return get();
   }
@@ -63,7 +65,7 @@
   function stop() {
     generation++;
     const previous = owner; owner = undefined;
-    if (previous) { chrome.tts?.stop(); notify(previous, 'idle', 'Reading stopped.'); }
+    if (previous) { speech?.stop(); notify(previous, 'idle', 'Reading stopped.'); }
   }
   async function read(message, sender) {
     if (!Number.isInteger(sender.tab?.id) || !Number.isInteger(sender.frameId) ||
@@ -73,11 +75,11 @@
     const target = { tabId: sender.tab.id, frameId: sender.frameId, documentId: sender.documentId, requestId: message.requestId };
     // Stop the old utterance before any asynchronous work can start a replacement.
     const previous = owner; owner = target;
-    if (previous) { chrome.tts?.stop(); notify(previous, 'idle', 'Reading stopped.'); }
+    if (previous) { speech?.stop(); notify(previous, 'idle', 'Reading stopped.'); }
     const [{ settings }, tab] = await Promise.all([chrome.storage.local.get('settings'), chrome.tabs.get(sender.tab.id)]);
     if (token !== generation) return { ok: false, cancelled: true };
     if (!enabled(settings) || !tab.active) { owner = undefined; return { ok: false, cancelled: true }; }
-    if (!chrome.tts?.getVoices || !chrome.tts?.speak) throw new Error('Speech is unavailable. Reload the extension.');
+    if (!speech?.getVoices || !speech?.speak) throw new Error('Speech is unavailable. Reload the extension.');
     const voices = await localVoices();
     if (token !== generation) return { ok: false, cancelled: true };
     const preference = settings.dyslexia.speech ?? {};
@@ -85,7 +87,7 @@
     const { voice, notice } = await chooseVoice(message.text, voices, preference, message.languageHint);
     if (token !== generation) return { ok: false, cancelled: true };
     const rate = typeof preference.rate === 'number' && Number.isFinite(preference.rate) ? Math.min(2, Math.max(0.5, preference.rate)) : 1;
-    await chrome.tts.speak(message.text.trim(), {
+    await speech.speak(message.text.trim(), {
       voiceName: voice.voiceName, ...(voice.extensionId ? { extensionId: voice.extensionId } : {}),
       ...(languageCode(voice.lang) ? { lang: voice.lang.replaceAll('_', '-') } : {}), rate, enqueue: false,
       onEvent: event => {
@@ -106,7 +108,7 @@
       respond({ ok: true }); return;
     }
     if (message?.type === 'clearspace:speech-stop-all') {
-      if (sender.url?.startsWith(chrome.runtime.getURL(''))) { stop(); chrome.tts?.stop(); respond({ ok: true }); }
+      if (sender.url?.startsWith(chrome.runtime.getURL(''))) { stop(); speech?.stop(); respond({ ok: true }); }
       return;
     }
     if (message?.type !== 'clearspace:selection-read') return;

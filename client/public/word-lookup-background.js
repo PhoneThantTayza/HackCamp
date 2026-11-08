@@ -1,5 +1,6 @@
 // Only an enabled, permitted content script can request a fixed Google lookup URL.
 (() => {
+  const chrome = globalThis.browser ?? globalThis.chrome;
   const windows = new Map();
   let queue = Promise.resolve();
   chrome.windows.onRemoved.addListener(id => {
@@ -14,6 +15,7 @@
     if (!text || text.length > 120 || text.split(' ').length > 8 || !/\p{L}/u.test(text)) return { ok: false, message: 'Select a word or short phrase (up to 8 words and 120 characters).' };
     const { settings } = await chrome.storage.local.get('settings');
     if (settings?.version !== 1 || settings.enabled !== true || settings.dyslexia?.enabled === false || settings.dyslexia?.experiences?.unfamiliarWords !== true) return { ok: false, cancelled: true, message: 'Enable word lookup and select Save and apply in Clearspace.' };
+    if (globalThis.browser?.runtime?.getBrowserInfo && !(await chrome.permissions.contains({ data_collection: ['websiteContent'] }))) return { ok: false, cancelled: true, message: 'Allow word lookup to send selected words to Google in Accessify settings.' };
     const url = `https://www.google.com/search?q=${encodeURIComponent(`${text} definition pronunciation`)}`;
     const previous = windows.get(sender.tab.windowId);
     if (previous) {
