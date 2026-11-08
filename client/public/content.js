@@ -93,8 +93,11 @@
     if (settings.selected.includes("cognitive:Hide distractions")) {
       // Ad rules apply throughout the page, including inside articles and dialogs.
       // CSS also covers ads inserted later without changing the site's DOM.
-      // Never hide a primary-content container that happens to have an ad token.
-      css += `\nbody :is(${adSelectors.join(",\n")}):not(main, [role="main"]):not(:has(main, [role="main"])) { display: none !important; }`;
+      // Never hide a primary-content container that happens to have an ad token,
+      // or a video player: YouTube marks its own player "ad-created" once its
+      // ad system loads, even when no ad is playing.
+      const keep = `main, [role="main"], video, iframe[src*="youtube.com/embed" i], iframe[src*="youtube-nocookie.com/embed" i], iframe[src*="player.vimeo.com" i]`;
+      css += `\nbody :is(${adSelectors.join(",\n")}):not(${keep}):not(:has(${keep})) { display: none !important; }`;
       // For general clutter, also preserve containers holding forms or dialogs.
       css += `\nbody :is(
         aside, [role="complementary"],
