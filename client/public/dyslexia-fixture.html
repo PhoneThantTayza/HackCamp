@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dyslexia adjustment fixture</title>
+<style>
+  body { font-family: Georgia, serif; margin: 2rem; background: #fff; color: #222; }
+  main { max-width: 70rem; }
+  p { line-height: 1.3; }
+  :focus-visible { outline: 3px solid blue; }
+</style>
+<main>
+  <h1>Reading adjustments test page</h1>
+  <p>A reading paragraph with <strong>bold text</strong>, <em>emphasis</em>, and a <a href="#form">working link to the form</a>. Repeated preference changes should preserve these elements and their behavior. Shorter visual lines should change the layout without changing these words.</p>
+  <ul><li>List text should receive reading preferences.</li></ul>
+  <p dir="rtl" lang="ar">هذا نص لاختبار اتجاه القراءة من اليمين إلى اليسار.</p>
+  <pre><code>Code should keep its original font and spacing.</code></pre>
+  <div contenteditable="true" role="textbox" aria-label="Editable sample"><p>Editable text should keep its typography. Try typing here.</p></div>
+  <form id="form" onsubmit="event.preventDefault()">
+    <label>Your notes <textarea>Keep this input when settings change.</textarea></label>
+    <button>Check keyboard and pointer interaction</button>
+  </form>
+  <button id="add">Add a paragraph dynamically</button>
+  <section id="dynamic" aria-label="Dynamic reading content"></section>
+</main>
+<script>
+  document.getElementById('add').addEventListener('click', () => {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'This paragraph was added after applying preferences. CSS should adjust it without re-extracting the page.';
+    document.getElementById('dynamic').append(paragraph);
+  });
+</script>
+</html>

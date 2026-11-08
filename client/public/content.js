@@ -11,7 +11,12 @@
   if (globalThis.clearspaceApply) {
     return applySavedSettings();
   }
+  // Clean up an older engine before upgrading an already-open page.
+  if (globalThis.clearspaceApply) globalThis.clearspaceApply({ version: 1, enabled: false, selected: [] });
+  if (globalThis.clearspaceStorageListener) chrome.storage.onChanged.removeListener(globalThis.clearspaceStorageListener);
   let sheet;
+  const dyslexia = globalThis.clearspaceDyslexia?.createController(document);
+  const speech = globalThis.clearspaceSelectionReader?.createController(document, chrome);
   let restoreContrast;
   let restoreSurfaces;
   let filterSvg;
@@ -33,6 +38,8 @@
     restoreSurfaces = undefined;
     if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter(item => item !== sheet);
     sheet = undefined;
+    dyslexia?.reset();
+    speech?.update(settings);
     filterSvg?.remove();
     filterSvg = undefined;
     if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) return;
@@ -79,11 +86,16 @@
       sheet.replaceSync(css);
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
     }
+    if (settings.dyslexia) dyslexia?.apply(settings.dyslexia, {
+      highContrast: names.has("High contrast"), extraLineSpacing: names.has("Extra line spacing")
+    });
     restoreSurfaces = globalThis.clearspaceLightSensitivity.applySurfaces(document.documentElement, lightOptions, settings.lightSensitivity);
     if (names.has("Higher contrast")) restoreContrast = globalThis.clearspaceLowVision.applyContrast(document.body, strengths["Higher contrast"]);
   };
-  chrome.storage.onChanged.addListener((changes, area) => {
+  globalThis.clearspaceApply.version = 9;
+  globalThis.clearspaceStorageListener = (changes, area) => {
     if (area === "local" && changes.settings) globalThis.clearspaceApply(changes.settings.newValue);
   });
+  chrome.storage.onChanged.addListener(globalThis.clearspaceStorageListener);
   return applySavedSettings();
 })();

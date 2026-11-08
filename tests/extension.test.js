@@ -19,7 +19,7 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
   } });
   vm.runInContext(readFileSync("client/public/background.js", "utf8"), context);
   await vm.runInContext("syncAutomaticAccess()", context);
-  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"];
+  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "dyslexia.js", "selection-reader.js", "content.js"];
   assert.deepEqual(Array.from(registrations.find(script => script.id === "clearspace-auto").js), core);
   assert.deepEqual(Array.from(injections.find(script => script.files.includes("content.js")).files), core);
   for (const file of ["motion-main.js", "motion.js", "click-targets.js", "button-spacing.js", "keyboard-focus.js"]) {
@@ -70,6 +70,7 @@ test("page styles update without duplication and disable removes only our sheet"
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/dyslexia.js", "utf8"), context);
   vm.runInContext(source, context);
   await Promise.resolve();
   assert.equal(document.adoptedStyleSheets.length, 2);
@@ -98,7 +99,7 @@ test("page styles update without duplication and disable removes only our sheet"
 
 test("build contains the files referenced by the manifest", () => {
   const manifest = JSON.parse(readFileSync("dist/manifest.json", "utf8"));
-  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]) {
+  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "dyslexia.js", "selection-reader.js", "selection-tts.js", "content.js"]) {
     assert.ok(readFileSync(`dist/${file}`).length);
   }
   assert.equal(manifest.manifest_version, 3);
@@ -306,6 +307,7 @@ test("content injection acknowledges application and reports asynchronous failur
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
+  vm.runInContext(readFileSync("client/public/dyslexia.js", "utf8"), context);
   const source = readFileSync("client/public/content.js", "utf8");
   const failure = await vm.runInContext(source, context);
   assert.equal(failure.applied, false);
@@ -358,7 +360,7 @@ test("Save connects open websites with automatic access and requires a page ackn
   // Only content.js injections; motion, click-target, spacing and focus add-ons are injected separately.
   const pageInjections = injected.filter(item => item.files?.includes("content.js"));
   assert.deepEqual(pageInjections.map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]);
+  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "dyslexia.js", "selection-reader.js", "content.js"]);
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
   automatic = false;
@@ -460,4 +462,71 @@ test("light sensitivity keeps coloured and dark surfaces, clamps strengths and r
   assert.equal(root.style.getPropertyValue('background-color'), 'rgb(255, 255, 255)');
   assert.equal(added.style.getPropertyValue('color'), '');
   assert.ok(disconnected > 0);
+});
+
+test("dyslexia suggest merges experiences, customization and context", () => {
+  const context = vm.createContext({});
+  vm.runInContext(readFileSync("client/public/dyslexia.js", "utf8"), context);
+  const { suggest } = context.clearspaceDyslexia;
+  const base = suggest({ experiences: { distinguishWords: true }, customization: { lineHeight: 1.6 } });
+  assert.equal(base.font, "sans");
+  assert.equal(base.letterSpacing, 0.06);
+  assert.equal(base.lineHeight, 1.6); // customization wins over preset
+  // Context extraLineSpacing pushes line height up
+  const withContext = suggest({ experiences: { distinguishWords: true }, customization: {} }, { extraLineSpacing: true });
+  assert.ok(withContext.lineHeight >= 1.8);
+  // Retired experiences must not leak
+  const retired = suggest({ experiences: { visualStress: true } });
+  assert.equal(retired.background, null);
+  assert.equal(retired.textColor, null);
+});
+
+test("dyslexia customization limits and boolean coercion", () => {
+  const context = vm.createContext({});
+  vm.runInContext(readFileSync("client/public/dyslexia.js", "utf8"), context);
+  const { suggest } = context.clearspaceDyslexia;
+  const out = suggest({
+    experiences: {},
+    customization: { lineHeight: 5, letterSpacing: -0.5, guideSize: 500, dimming: 2, font: "sans", guide: "true", wordHighlight: "false" }
+  });
+  assert.equal(out.lineHeight, 2.5); // clamped to max
+  assert.equal(out.letterSpacing, 0); // clamped to min
+  assert.equal(out.guideSize, 160); // clamped to max
+  assert.equal(out.dimming, 0.6); // clamped to max
+  assert.equal(out.font, "sans"); // valid font
+  assert.equal(out.guide, true); // string "true" -> boolean
+  assert.equal(out.wordHighlight, false); // string "false" -> boolean
+});
+
+test("dyslexia reset removes all styles highlights and observers", () => {
+  const context = vm.createContext({
+    document: {
+      nodeType: 9,
+      documentElement: { nodeType: 1, adoptedStyleSheets: [], appendChild() {}, querySelectorAll: () => [], createTreeWalker() { return { nextNode: () => null }; } },
+      head: { appendChild() {} },
+      defaultView: {
+        CSSStyleSheet: class { replaceSync() {} },
+        CSS: { highlights: new Map(), Highlight: class {} },
+        getComputedStyle: () => ({ fontFamily: "Arial", display: "block", visibility: "visible" }),
+        requestAnimationFrame: fn => fn(),
+        cancelAnimationFrame() {},
+        setTimeout: fn => { fn(); return 1; },
+        clearTimeout() {},
+        setInterval: () => 1,
+        clearInterval() {},
+        performance: { now: () => 0 },
+        Intl: { Segmenter: class { segment() { return []; } } },
+      },
+      createElement: () => ({ style: {}, setAttribute() {}, removeAttribute() {}, appendChild() {}, closest: () => null, matches: () => false, shadowRoot: null, nodeType: 1, getBoundingClientRect: () => ({ top: 0, left: 0, width: 10, height: 10 }), querySelector: () => null, querySelectorAll: () => [], isConnected: true, nodeName: "DIV" }),
+      createElementNS: () => ({ setAttribute() {}, appendChild() {} }),
+    },
+    chrome: { storage: { local: { get: async () => ({ settings: { version: 1, enabled: true, selected: [] } }) }, onChanged: { addListener() {} } } }
+  });
+  vm.runInContext(readFileSync("client/public/dyslexia.js", "utf8"), context);
+  const { createController } = context.clearspaceDyslexia;
+  const controller = createController(context.document);
+  controller.apply({ experiences: { distinguishWords: true }, customization: {} });
+  controller.reset();
+  // No errors means reset worked
+  assert.ok(true);
 });

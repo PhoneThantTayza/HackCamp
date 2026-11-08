@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { defaults, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
+import ReadAloud from "./ReadAloud.jsx";
 
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
-  { id: "dyslexia", name: "Dyslexia", icon: "type", description: "Reading at your rhythm.", options: ["Readable font", "Wider letter spacing", "Shorter lines", "Reading guide", "Left-aligned text"] },
+  { id: "dyslexia", name: "Dyslexia", icon: "type", description: "Reading at your rhythm.", options: [] },
   { id: "motor", name: "Motor / mobility", icon: "hand", description: "More room to navigate.", options: ["Larger click targets", "Extra button spacing", "Keyboard focus indicators", "Reduce motion"] },
   { id: "cognitive", name: "Cognitive", icon: "spark", description: "Less noise. More focus.", options: ["Simplified layout", "Hide distractions", "Clear headings", "Shorter paragraphs", "Reduce motion"] },
 ];
@@ -89,7 +91,7 @@ function LowVisionControls({ selected, onToggle, enabled, strengths, onStrengthC
   const [open, setOpen] = useState(false);
   const descriptions = [
     "Enlarge the page by up to 50% and give controls more room.",
-    "Gradually improve text contrast while keeping the page’s background colours.",
+    "Gradually improve text contrast while keeping the page's background colours.",
     "Emphasize links with bold text and thicker underlines.",
     "Show a strong black-and-white outline as you tab through the page.",
   ];
@@ -156,15 +158,119 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
   </div>;
 }
 
-function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange, lightStrengths, onLightChange }) {
+function DyslexiaControls({ value, onChange, enabled, speechReset }) {
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const count = dyslexiaChoiceCount(value);
+  const custom = value.customization;
+
+  const sections = [
+    { title: 'Reading comfort', choices: [
+      ['distinguishWords', 'Hard to distinguish letters or words', 'Readable font, wider spacing. Hover to highlight the current word.'],
+      ['readingFatigue', 'Reading feels tiring over time', 'Hover a passage to highlight it without hiding surrounding content.'],
+    ] },
+    { title: 'Reading comprehension', choices: [
+      ['overwhelmingParagraphs', 'Long paragraphs feel overwhelming', 'Extra paragraph space, shorter lines, more line spacing.'],
+      ['unfamiliarWords', 'Unfamiliar words are hard to sound out', 'Word explanations coming later.', true],
+    ], note: 'Summaries and simpler language coming later.' },
+    { title: 'Reading focus & tracking', choices: [
+      ['losePlace', 'I lose my place while reading', 'Pointer-following guide over text and controls. Right-click toggles.'],
+    ] },
+    { title: 'Reading pace & listening', choices: [
+      ['preferListening', 'I prefer listening to text', 'Highlight text to hear it read aloud. Escape stops.'],
+    ] },
+  ];
+  const numberFields = [
+    ['lineHeight', 'Space between lines', 1, 2.5, 0.1],
+    ['letterSpacing', 'Space between letters (em)', 0, 0.2, 0.01],
+    ['wordSpacing', 'Space between words (em)', 0, 0.5, 0.01],
+    ['lineLength', 'Line width (characters)', 30, 100, 1],
+    ['paragraphSpacing', 'Space after paragraphs (em)', 0, 2, 0.1],
+    ['guideSize', 'Guide height (pixels)', 20, 160, 1],
+    ['dimming', 'Surrounding dimness (0–0.6)', 0, 0.6, 0.05],
+  ];
+
+  function customize(key, next) {
+    const customization = { ...custom };
+    if (next === undefined) delete customization[key];
+    else customization[key] = next;
+    onChange({ ...value, enabled: true, customization });
+  }
+
+  const filtered = sections.map(section => ({ ...section, choices: section.choices.filter(choice =>
+    `${section.title} ${choice[1]} ${choice[2]}`.toLowerCase().includes(query.toLowerCase())) })).filter(section => section.choices.length);
+
+  return <div className="dyslexia-controls">
+    <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls="dyslexia-options" onClick={() => setOpen(!open)}><span>Dyslexia</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
+    <div id="dyslexia-options" hidden={!open}>
+      <p className="muted control-description">Which describes your experience? Select any. We suggest changes for you; customization is optional.</p>
+      {Object.keys(custom).length > 0 && <div className="dyslexia-help">
+        <p className="muted">Custom settings are overriding some suggestions.</p>
+        <button type="button" className="clear-button" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Clear custom overrides</button>
+      </div>}
+      {searching && <input autoFocus type="search" className="option-search" aria-label="Find Dyslexia experience" placeholder="Find an experience…" value={query} onChange={event => setQuery(event.target.value)} />}
+      {filtered.map(section => <fieldset className="dyslexia-section" key={section.title}>
+        <legend>{section.title}</legend>
+        {section.choices.map(([id, label, help, unavailable]) => <details key={id} className="dyslexia-choice">
+          <summary className="dyslexia-choice-summary">
+            <label className="option-row" htmlFor={`dyslexia-${id}`}>
+              <input id={`dyslexia-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
+                onChange={event => onChange({ ...value, enabled: true,
+                  experiences: { ...value.experiences, [id]: event.target.checked } })} />
+              <span>{label}</span>
+            </label>
+          </summary>
+          <div className="dyslexia-choice-content">
+            <p className="muted dyslexia-help">{help}</p>
+            {id === 'preferListening' && value.experiences.preferListening === true &&
+              <ReadAloud key={speechReset} enabled={enabled} embedded preferences={value.speech}
+                onChange={speech => onChange({ ...value, speech })} />}
+          </div>
+        </details>)}
+        {section.note && <p className="muted dyslexia-help">{section.note}</p>}
+      </fieldset>)}
+      {!filtered.length && <p className="muted text-xs">No matching experiences.</p>}
+      <details className="dyslexia-customization">
+        <summary>Customize suggested changes</summary>
+        <p className="muted dyslexia-help">Custom values override your experience choices. Use suggested settings below to remove overrides.</p>
+        {Object.keys(custom).length > 0 && <p className="muted dyslexia-help" role="status">{Object.keys(custom).length} custom override{Object.keys(custom).length === 1 ? '' : 's'} active.</p>}
+        <label className="dyslexia-field">Font
+          <select aria-label="Font" value={custom.font === null ? 'website' : custom.font ?? ''} onChange={event => customize('font', event.target.value === '' ? undefined : event.target.value === 'website' ? null : event.target.value)}>
+            <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
+          </select>
+        </label>
+        {numberFields.map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
+          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
+            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
+            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
+        </label>)}
+        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
+          <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
+            <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
+          </select>
+        </label>)}
+        {[['guideColor', 'Guide color', '#ffe58a']].map(([key, label, fallback]) => <div className="dyslexia-color" key={key}>
+          <label className="option-row"><input type="checkbox" checked={Boolean(custom[key])} onChange={event => customize(key, event.target.checked ? fallback : undefined)} /><span>Choose {label.toLowerCase()}</span></label>
+          {custom[key] && <input type="color" aria-label={label} value={custom[key]} onChange={event => customize(key, event.target.value)} />}
+        </div>)}
+        <button type="button" className="clear-button text-xs" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Use suggested settings</button>
+      </details>
+      <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
+    </div>
+  </div>;
+}
+
+function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange, lightStrengths, onLightChange, dyslexia, onDyslexiaChange, speechReset }) {
   const [open, setOpen] = useState(group.id === "vision");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const count = group.options.filter(option => selected.includes(`${group.id}:${option}`)).length + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0);
+  const count = group.options.filter(option => selected.includes(`${group.id}:${option}`)).length + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
   const options = group.options.filter(option => option.toLowerCase().includes(query.toLowerCase()));
   const showColour = group.id === "vision" && "colour color blindness protan deutan tritan red green blue yellow strength cues".includes(query.toLowerCase());
   const showLowVision = group.id === "vision" && `low vision strength ${lowVisionOptions.join(" ")}`.toLowerCase().includes(query.toLowerCase());
   const showLight = group.id === "vision" && `light sensitivity brightness dim page soften bright backgrounds warm colour color tint dark page theme strength`.includes(query.toLowerCase());
+  const showDyslexia = group.id === "dyslexia" && `dyslexia reading comfort comprehension focus pace listening distinguish words fatigue overwhelming paragraphs unfamiliar lose place listening font spacing line length paragraph guide dimming highlight color`.includes(query.toLowerCase());
   return <section className={`choice-card ${open ? "is-open" : ""}`}>
     <div className="flex items-start justify-between gap-2">
       <span className="category-icon"><Icon name={group.icon} size={23} /></span>
@@ -173,15 +279,16 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
     <button type="button" className="category-button" aria-expanded={open} aria-controls={`${group.id}-options`} onClick={() => setOpen(!open)}>
       <span className="flex items-center justify-between gap-2"><span className="text-base font-medium">{group.name}</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></span>
       <span className="muted mt-2 block text-xs">{group.description}</span>
-      <span className="muted mt-5 block text-xs">{count ? `${count} selected` : `${group.id === "vision" ? 3 : group.options.length} adjustments`}</span>
+      <span className="muted mt-5 block text-xs">{count ? `${count} selected` : `${group.id === "vision" ? 3 : group.id === "dyslexia" ? "Choose what reading feels like" : group.options.length} adjustments`}</span>
     </button>
     {open && <div id={`${group.id}-options`} className="options-list">
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
       {options.map(option => <label key={option} className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>)}
-      {!options.length && !showColour && !showLowVision && !showLight && <p className="muted text-xs py-2">No matching adjustments.</p>}
+      {!options.length && !showColour && !showLowVision && !showLight && !showDyslexia && <p className="muted text-xs py-2">No matching adjustments.</p>}
       {showColour && <ColourVisionControls value={colour} onChange={onColourChange} enabled={enabled} />}
       {showLight && <LightSensitivityControls selected={selected} onToggle={onToggle} enabled={enabled} strengths={lightStrengths} onStrengthChange={onLightChange} />}
       {showLowVision && <LowVisionControls strengths={lowVisionStrengths} onStrengthChange={onLowVisionChange} selected={selected} onToggle={onToggle} enabled={enabled} />}
+      {showDyslexia && <DyslexiaControls value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} speechReset={speechReset} />}
     </div>}
   </section>;
 }
@@ -189,6 +296,7 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
 export default function App() {
   const [light, setLight] = useState(false);
   const [selected, setSelected] = useState([]);
+  const [dyslexia, setDyslexia] = useState(emptyDyslexia);
   const [enabled, setEnabled] = useState(true);
   const [colour, setColour] = useState(defaults.colorVision);
   const [lowVisionStrengths, setLowVisionStrengths] = useState(defaults.lowVision);
@@ -197,20 +305,23 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [speechReset, setSpeechReset] = useState(0);
   useEffect(() => { loadSettings().then(settings => {
-    setLight(settings.light); setSelected(settings.selected); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
+    setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
   function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); setStatus("Unsaved changes. Select Save and apply."); }
+  function changeDyslexia(value) { setDyslexia(value); setStatus("Unsaved changes. Select Save and apply."); }
   function changeColour(value) { setColour(value); setStatus("Unsaved changes. Select Save and apply."); }
   function changeLowVision(value) { setLowVisionStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
   function changeLight(value) { setLightStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function clearChoices() { setSelected([]); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setStatus("Unsaved changes. Select Save and apply."); }
-  const selectionCount = selected.length + Number(colour.mode !== "off") + Number(colour.cues);
+  function clearChoices() { setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setStatus("Unsaved changes. Select Save and apply."); }
+  const choiceCount = selected.length + Number(colour.mode !== "off") + Number(colour.cues) + dyslexiaChoiceCount(dyslexia);
   async function persist(reset = false) {
+    if (reset) setSpeechReset(value => value + 1);
     setBusy(true); setError(""); setStatus("");
     try {
-      await saveSettings(reset ? { ...defaults, light } : { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths });
-      if (reset) { setSelected([]); setEnabled(true); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); }
+      await saveSettings(reset ? { ...defaults, light, dyslexia: emptyDyslexia() } : { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, dyslexia });
+      if (reset) { setSelected([]); setDyslexia(emptyDyslexia()); setEnabled(true); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); }
       setStatus(await applyToTarget());
     } catch (error) { setError(error.message); }
     finally { setBusy(false); }
@@ -234,14 +345,14 @@ export default function App() {
         <p className="eyebrow muted">LESS FRICTION. MORE POSSIBILITY.</p>
         <h1 id="welcome-title">The web, on your terms.</h1>
         <p className="intro muted">Welcome to Clearspace. A little space to make the web feel right for you.</p>
-        {!isExtension && <p className="controls-feedback text-sm">You’re viewing the local demo. To adjust websites, run <code>npm run build</code>, open <code>chrome://extensions</code>, enable Developer mode and load this project’s <code>dist</code> folder. Then open a website and click the Clearspace toolbar icon.</p>}
+        {!isExtension && <p className="controls-feedback text-sm">You're viewing the local demo. To adjust websites, run <code>npm run build</code>, open <code>chrome://extensions</code>, enable Developer mode and load this project's <code>dist</code> folder. Then open a website and click the Clearspace toolbar icon.</p>}
       </section>
 
       <section className="accessibility-section" aria-labelledby="adjustments-title">
         <div className="flex items-center justify-between gap-3 mb-2"><h2 id="adjustments-title" className="text-sm font-medium">What would make browsing easier?</h2><span className="optional-tag">OPTIONAL</span></div>
         <p className="muted text-sm">Choose what works for you. You can mix and match.</p>
-        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} enabled={enabled} />)}</fieldset>
-        <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{selectionCount ? `${selectionCount} adjustment${selectionCount === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{selectionCount > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={clearChoices}>Clear all</button>}</div>
+        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
+        <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{choiceCount ? `${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{choiceCount > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={clearChoices}>Clear all</button>}</div>
       </section>
 
       <section className="extension-controls" aria-label="Extension controls">
