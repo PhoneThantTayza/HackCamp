@@ -409,7 +409,7 @@ function MotorControls({ options, ...props }) {
 }
 
 function AccessibilityCard({ group, motorSettings, onMotorChange, selected, onToggle, colour, onColourChange, enabled, lowVisionStrengths, onLowVisionChange, lightStrengths, onLightChange, focusSettings, onFocusChange, dyslexia, onDyslexiaChange, speechReset }) {
-  const [open, setOpen] = useState(group.id === "vision");
+  const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const count = group.options.filter(option => option !== 'Focus mode' && selected.includes(`${group.id}:${option}`)).length + (group.id === 'cognitive' ? Number(dyslexia.experiences.losePlace === true) : 0) + (group.id === "vision" ? Number(colour.mode !== "off") + Number(colour.cues) + [...lowVisionOptions, ...lightSensitivityOptions].filter(option => selected.includes(`vision:${option}`)).length : 0) + (group.id === "dyslexia" ? dyslexiaChoiceCount(dyslexia) : 0);
