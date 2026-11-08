@@ -11,7 +11,7 @@ async function syncAutomaticAccess() {
   if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: registered.map(script => script.id) });
   if (granted) {
     await chrome.scripting.registerContentScripts([{
-      id: "clearspace-auto", matches: origins, js: ["content.js"], runAt: "document_idle"
+      id: "clearspace-auto", matches: origins, js: ["color-vision.js", "content.js"], runAt: "document_idle"
     }, {
       // Reduce motion: wraps HTMLMediaElement.prototype.play in the page's own world.
       id: "clearspace-motion-main", matches: origins, js: ["motion-main.js"], runAt: "document_start", allFrames: true, world: "MAIN"
@@ -22,7 +22,7 @@ async function syncAutomaticAccess() {
     }]);
     const tabs = await chrome.tabs.query({});
     await Promise.allSettled(tabs.flatMap(tab => [
-      chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }),
+      chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["color-vision.js", "content.js"] }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion-main.js"], world: "MAIN" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion.js"] }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["click-targets.js"] })
