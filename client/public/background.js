@@ -6,7 +6,7 @@ chrome.action.onClicked.addListener(tab => {
 async function syncAutomaticAccess() {
   const origins = ["http://*/*", "https://*/*"];
   const granted = await chrome.permissions.contains({ origins });
-  const ids = ["clearspace-auto", "clearspace-motion-main", "clearspace-motion"];
+  const ids = ["clearspace-auto", "clearspace-motion-main", "clearspace-motion", "clearspace-click-targets"];
   const registered = await chrome.scripting.getRegisteredContentScripts({ ids });
   if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: registered.map(script => script.id) });
   if (granted) {
@@ -17,12 +17,15 @@ async function syncAutomaticAccess() {
       id: "clearspace-motion-main", matches: origins, js: ["motion-main.js"], runAt: "document_start", allFrames: true, world: "MAIN"
     }, {
       id: "clearspace-motion", matches: origins, js: ["motion.js"], runAt: "document_start", allFrames: true
+    }, {
+      id: "clearspace-click-targets", matches: origins, js: ["click-targets.js"], runAt: "document_start", allFrames: true
     }]);
     const tabs = await chrome.tabs.query({});
     await Promise.allSettled(tabs.flatMap(tab => [
       chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion-main.js"], world: "MAIN" }),
-      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion.js"] })
+      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion.js"] }),
+      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["click-targets.js"] })
     ]));
   }
 }

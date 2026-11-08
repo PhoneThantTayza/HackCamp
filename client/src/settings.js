@@ -15,10 +15,11 @@ export async function applyToTarget() {
   if (!value || !/^\d+$/.test(value)) return "Settings saved. Click the extension icon on a webpage to apply there, or enable automatic site access.";
   try {
     await chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["content.js"] });
-    // Reduce motion add-on; failures here must not affect the content.js result above.
+    // Reduce motion + click targets add-ons; failures here must not affect the content.js result above.
     await Promise.allSettled([
       chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["motion-main.js"], world: "MAIN" }),
-      chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["motion.js"] })
+      chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["motion.js"] }),
+      chrome.scripting.executeScript({ target: { tabId: Number(value) }, files: ["click-targets.js"] })
     ]);
     return "Settings saved and sent to the original tab. Already connected tabs also receive updates.";
   } catch {
