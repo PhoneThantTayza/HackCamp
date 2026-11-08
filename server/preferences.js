@@ -16,11 +16,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { auth } from "express-oauth2-jwt-bearer";
+import { neonPreferences } from './neon-preferences.js';
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || "dev-tsmyxcbitdn1q1vy.us.auth0.com";
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || "https://accessify-api";
 
-// A small JSON file is enough for the demo; swap for a real database later.
+// File storage is only a local development fallback, not Render persistence.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = process.env.PREFERENCES_FILE || path.join(here, "data", "preferences.json");
 
@@ -41,27 +42,53 @@ function isValidSettings(settings) {
 
 export function preferencesRouter() {
   const router = express.Router();
+  const database = process.env.DATABASE_URL ? neonPreferences(process.env.DATABASE_URL) : null;
+  const production = process.env.NODE_ENV === 'production' || process.argv.includes('--production') || process.env.RENDER === 'true';
+  function requireStorage() {
+    if (!database && production) {
+      const error = new Error('Database is not configured');
+      error.code = 'DATABASE_URL_MISSING';
+      throw error;
+    }
+  }
 
   router.use(auth({ audience: AUTH0_AUDIENCE, issuerBaseURL: `https://${AUTH0_DOMAIN}/` }));
 
-  router.get("/", (req, res) => {
-    const saved = readAll()[req.auth.payload.sub];
-    res.json({ settings: saved?.settings ?? null, updatedAt: saved?.updatedAt ?? null });
+  router.get("/", async (req, res, next) => {
+    try {
+      requireStorage();
+      const saved = database ? await database.get(req.auth.payload.sub) : readAll()[req.auth.payload.sub];
+      res.json({ settings: saved?.settings ?? null, updatedAt: saved?.updatedAt ?? null });
+    } catch (error) { next(error); }
   });
 
-  router.put("/", (req, res) => {
+  router.put("/", async (req, res, next) => {
     const settings = req.body?.settings;
     if (!isValidSettings(settings)) return res.status(400).json({ error: "Those don't look like Clearspace settings." });
-    const all = readAll();
-    const updatedAt = new Date().toISOString();
-    all[req.auth.payload.sub] = { settings, updatedAt };
-    writeAll(all);
-    res.json({ ok: true, updatedAt });
+    try {
+      requireStorage();
+      let updatedAt;
+      if (database) {
+        updatedAt = await database.put(req.auth.payload.sub, settings);
+      } else {
+        const all = readAll();
+        updatedAt = new Date().toISOString();
+        all[req.auth.payload.sub] = { settings, updatedAt };
+        writeAll(all);
+      }
+      res.json({ ok: true, updatedAt });
+    } catch (error) { next(error); }
   });
 
   // Turn token problems into clear JSON instead of an HTML error page
   router.use((error, _req, res, _next) => {
     const status = error.status || 500;
+    if (status >= 500) {
+      // Log diagnostic codes only: never tokens, account IDs or saved preferences.
+      const code = typeof error.code === 'string' && /^[A-Z0-9_]+$/.test(error.code) ? error.code : 'UNKNOWN';
+      const operation = ['mkdir', 'open', 'write', 'rename', 'read'].includes(error.syscall) ? error.syscall : 'request';
+      console.error(`[preferences] ${operation} failed (${code}). Check DATABASE_URL and Neon availability; local file storage also requires a writable path.`);
+    }
     res.status(status).json({ error: status === 401 ? "Please log in again." : "Something went wrong saving your settings." });
   });
 

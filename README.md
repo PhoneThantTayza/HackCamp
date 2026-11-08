@@ -48,6 +48,8 @@ The development command runs a local UI demo; it cannot adjust other websites. T
 
 ## Deployment and limits
 
+For account sync on Render Free, add the Neon connection string as the server environment variable `DATABASE_URL`, then deploy. The server creates its preferences table automatically; no persistent disk is needed. Keep `DATABASE_URL` out of Git and all `VITE_` variables. Auth0 login remains unchanged. Existing file-based account settings are not migrated; sign in and use **Sync now** to save your local choices to Neon.
+
 Copy `.env.example` to `.env.local` in the project root. After hosting the sync server, set `VITE_API_URL` to its HTTPS origin and rebuild. The build updates both the client API address and the extension's server permission. Until then, the default remains `http://127.0.0.1:3000`; run `npm run dev` for local sync. Auth0 must also allow the callback URL displayed under **Setting up Auth0?** in the installed extension.
 
 Chrome and Firefox are our deployment targets. Build each package separately for store submission; local installation is for development, not a published release.
