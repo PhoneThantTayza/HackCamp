@@ -152,3 +152,4 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 /* Motor / mobility sliders and samples */
 .motor-range-ends { display: flex; justify-content: space-between; font-size: 0.75rem; margin-top: 0.25rem; }
 .motor-sample { display: flex; flex-wrap: wrap; align-items: center; }
+.motor-motion-list { list-style: none; padding: 0; margin: 0.25rem 0 0; display: grid; gap: 0.25rem; font-size: 0.875rem; }

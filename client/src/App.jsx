@@ -6,7 +6,7 @@ import ReadAloud from "./ReadAloud.jsx";
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
   { id: "dyslexia", name: "Dyslexia", icon: "type", description: "Reading at your rhythm.", options: [] },
-  { id: "motor", name: "Motor / mobility", icon: "hand", description: "More room to navigate.", options: ["Larger click targets", "Extra button spacing", "Keyboard focus indicators", "Reduce motion"] },
+  { id: "motor", name: "Motor / mobility", icon: "hand", description: "More room to navigate.", options: ["Larger click targets", "Extra button spacing", "Reduce motion"] },
   { id: "cognitive", name: "Cognitive", icon: "spark", description: "Less noise. More focus.", options: ["Focus mode", "Hide distractions"] },
 ];
 
@@ -290,18 +290,32 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
 
 const motorDescriptions = {
   "Larger click targets": "Make buttons and links bigger, with a soft outline, so they're easier to hit.",
-  "Extra button spacing": "Add room between buttons and links so you don't hit the wrong one by mistake.",
-  "Keyboard focus indicators": "Show a thick outline around whatever you've tabbed to, plus a \"Skip to main content\" button.",
-  "Reduce motion": "Stop animations, freeze GIFs and stop videos from playing by themselves.",
+  "Extra button spacing": "Add room between buttons and links so you don't hit the wrong one.",
+  "Reduce motion": "Calm down moving things on the page.",
 };
 
-// Options that get a slider: which setting it changes and how to describe each level
+// Each option's slider: which setting it changes and how each level is described
 const motorSliders = {
-  "Larger click targets": { key: "targetSize", name: "Size", label: level => motor.sizeLabel(level), px: level => motor.targetPx(level), ends: ["Comfortable", "Extra large"], kind: "size" },
-  "Extra button spacing": { key: "spacing", name: "Gap", label: level => motor.gapLabel(level), px: level => motor.gapPx(level), ends: ["Small", "Large"], kind: "spacing" },
+  "Larger click targets": { key: "targetSize", name: "Size", text: level => `${motor.sizeLabel(level)} · ${motor.targetPx(level)}px`, ends: ["Comfortable", "Extra large"], kind: "size" },
+  "Extra button spacing": { key: "spacing", name: "Gap", text: level => `${motor.gapLabel(level)} · ${motor.gapPx(level)}px`, ends: ["Small", "Large"], kind: "spacing" },
+  "Reduce motion": { key: "motion", name: "Strength", text: level => motor.motionLabel(level), ends: ["Gentle", "Still"], kind: "motion" },
 };
+
+// Vision-style sub-sections inside the Motor card
+const motorSections = [
+  { id: "clicking", name: "Clicking and tapping", description: "Make buttons and links easier to hit. Save to apply across websites with site access.", options: ["Larger click targets", "Extra button spacing"] },
+  { id: "motion", name: "Motion", description: "Stop things moving on their own. Drag the slider for how much to calm down.", options: ["Reduce motion"] },
+];
 
 function MotorSample({ kind, level, enabled }) {
+  if (kind === "motion") {
+    const step = motor.motionStep(level);
+    const parts = [["Animations and sliding effects", 1], ["Videos that play by themselves", 2], ["Animated GIFs and moving thumbnails", 3]];
+    return <div className="colour-preview">
+      <p className="colour-label">What {motor.motionLabel(level)} stops{!enabled && " · adjustments paused"}</p>
+      <ul className="motor-motion-list">{parts.map(([label, needed]) => <li key={label} className={step >= needed ? "" : "muted"}>{step >= needed ? "✓" : "–"} {label}</li>)}</ul>
+    </div>;
+  }
   return <div className="colour-preview">
     <p className="colour-label">Live sample{!enabled && " · adjustments paused"}</p>
     {[false, true].map(adjusted => {
@@ -319,30 +333,38 @@ function MotorSample({ kind, level, enabled }) {
   </div>;
 }
 
-function MotorControls({ options, selected, onToggle, value, onChange, enabled }) {
-  const [openOption, setOpenOption] = useState(null);
-  return <div id="motor-options">
-    {options.map((option, index) => {
-      const id = `motor-option-${index}`;
-      const open = openOption === option;
-      const on = selected.includes(`motor:${option}`);
-      const slider = motorSliders[option];
-      const level = slider ? value[slider.key] : 0;
-      return <div key={option} className="colour-controls">
-        <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls={`${id}-panel`} onClick={() => setOpenOption(open ? null : option)}><span>{option}{on && <small className="muted"> · On</small>}</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
-        <div id={`${id}-panel`} hidden={!open}>
-          <p className="muted control-description">{motorDescriptions[option]}</p>
-          <label className="option-row"><input type="checkbox" checked={on} onChange={() => onToggle(`motor:${option}`)} /><span>Turn on</span></label>
-          {slider && on && <>
-            <div className="colour-strength"><label htmlFor={`${id}-range`}>{slider.name}<span className="sr-only"> for {option}</span></label><output htmlFor={`${id}-range`}>{slider.label(level)} · {slider.px(level)}px</output></div>
-            <input id={`${id}-range`} className="colour-range" type="range" min="0" max="100" step="5" value={level} aria-valuetext={`${slider.label(level)}, ${slider.px(level)} pixels`} onChange={event => onChange({ ...value, [slider.key]: Number(event.target.value) })} />
+function MotorSection({ section, options, selected, onToggle, value, onChange, enabled }) {
+  const [open, setOpen] = useState(false);
+  return <div className="low-vision-controls">
+    <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls={`motor-${section.id}-options`} onClick={() => setOpen(!open)}><span>{section.name}</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
+    <div id={`motor-${section.id}-options`} hidden={!open}>
+      <p className="muted control-description">{section.description}</p>
+      {options.map(option => {
+        const on = selected.includes(`motor:${option}`);
+        const slider = motorSliders[option];
+        const level = value[slider.key];
+        const id = `motor-${slider.key}`;
+        return <div key={option} className="low-vision-option">
+          <label className="option-row"><input type="checkbox" checked={on} onChange={() => onToggle(`motor:${option}`)} /><span>{option}<small className="muted block">{motorDescriptions[option]}</small></span></label>
+          {on && <>
+            <div className="colour-strength"><label htmlFor={id}>{slider.name}<span className="sr-only"> for {option}</span></label><output htmlFor={id}>{slider.text(level)}</output></div>
+            <input id={id} className="colour-range" type="range" min="0" max="100" step="5" value={level} aria-valuetext={slider.text(level)} onChange={event => onChange({ ...value, [slider.key]: Number(event.target.value) })} />
             <div className="motor-range-ends muted" aria-hidden="true"><span>{slider.ends[0]}</span><span>{slider.ends[1]}</span></div>
             <MotorSample kind={slider.kind} level={level} enabled={enabled} />
           </>}
-        </div>
-      </div>;
+        </div>;
+      })}
+      <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
+    </div>
+  </div>;
+}
+
+function MotorControls({ options, ...props }) {
+  return <div id="motor-options">
+    {motorSections.map(section => {
+      const shown = section.options.filter(option => options.includes(option)); // respects the card's search
+      return shown.length > 0 && <MotorSection key={section.id} section={section} options={shown} {...props} />;
     })}
-    <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
   </div>;
 }
 
