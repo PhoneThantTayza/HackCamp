@@ -94,6 +94,21 @@ func textBounds(_ element: AXUIElement, _ range: CFRange) -> CGRect? {
     return box
 }
 func rectDictionary(_ r: CGRect?) -> Any { guard let r = r else { return NSNull() }; return ["x": r.origin.x, "y": r.origin.y, "width": r.width, "height": r.height] }
+// The app whose normal window is under the pointer (not necessarily the app in front).
+// Skips Clearspace's own see-through overlays and menu bar / Dock layers.
+func appUnderPointer(_ point: CGPoint) -> pid_t? {
+    let own: Set<pid_t> = [getpid(), getppid()]
+    guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+    for window in windows {
+        guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+              let pid = window[kCGWindowOwnerPID as String] as? Int32,
+              let boundsInfo = window[kCGWindowBounds as String] as? NSDictionary,
+              let bounds = CGRect(dictionaryRepresentation: boundsInfo), bounds.contains(point) else { continue }
+        if (window[kCGWindowAlpha as String] as? Double ?? 1) < 0.05 { continue }
+        return own.contains(pid) ? nil : pid // Clearspace's own settings window: nothing to highlight
+    }
+    return nil
+}
 func pointerText() {
     var word: CGRect?, passage: CGRect?
     defer {
@@ -101,12 +116,12 @@ func pointerText() {
         let key = "\(word.map { "\($0)" } ?? "-")|\(passage.map { "\($0)" } ?? "-")"
         if key != lastPointerText { lastPointerText = key; emit(event) }
     }
-    guard watching, readingWord || readingPassage, AXIsProcessTrusted(),
-          let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getppid() else { return }
+    guard watching, readingWord || readingPassage, AXIsProcessTrusted() else { return }
     // AppKit counts y from the bottom of the main screen; Accessibility counts from the top.
     let mouse = NSEvent.mouseLocation, height = NSScreen.screens.first?.frame.height ?? 0
     var point = CGPoint(x: mouse.x, y: height - mouse.y)
-    let application = AXUIElementCreateApplication(app.processIdentifier)
+    guard let pid = appUnderPointer(point) else { return }
+    let application = AXUIElementCreateApplication(pid)
     AXUIElementSetMessagingTimeout(application, 0.1)
     var hit: AXUIElement?
     guard AXUIElementCopyElementAtPosition(application, Float(point.x), Float(point.y), &hit) == .success,
