@@ -4,7 +4,7 @@
   const defaults = { "Dim page": 35, "Soften bright backgrounds": 50, "Warm colour tint": 40 };
   function normalize(value) {
     return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key,
-      Number.isFinite(value?.[key]) ? Math.round(Math.max(0, Math.min(100, value[key]))) : fallback]));
+      Number.isFinite(value?.[key]) ? Math.round(Math.max(0, Math.min(200, value[key]))) : fallback]));
   }
   function filters(selected, value) {
     const strengths = normalize(value), result = [];

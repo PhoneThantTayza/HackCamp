@@ -377,11 +377,16 @@ test("light sensitivity keeps coloured and dark surfaces, clamps strengths and r
   vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
   const { normalize, filters, surface, applySurfaces } = context.clearspaceLightSensitivity;
   assert.equal(normalize({ "Dim page": -10 })["Dim page"], 0);
-  assert.equal(normalize({ "Warm colour tint": 400 })["Warm colour tint"], 100);
+  assert.equal(normalize({ "Warm colour tint": 400 })["Warm colour tint"], 200);
+  for (const option of ['Dim page', 'Soften bright backgrounds', 'Warm colour tint']) {
+    assert.equal(normalize({ [option]: 200 })[option], 200);
+  }
+  assert.equal(filters(['Dim page', 'Warm colour tint'], { 'Dim page': 200, 'Warm colour tint': 200 }), 'brightness(0) sepia(0.7) saturate(1.4)');
   assert.equal(normalize({ "Dim page": NaN })["Dim page"], 35);
   assert.equal(filters([], {}), '');
   assert.equal(filters(['Dim page', 'Warm colour tint'], { 'Dim page': 0, 'Warm colour tint': 0 }), '');
   assert.equal(surface([255, 255, 255, 1], 100, false), 'rgba(222, 218, 208, 1)');
+  assert.equal(surface([255, 255, 255, 1], 200, false), 'rgba(189, 181, 161, 1)');
   assert.equal(surface([255, 255, 255, 1], 0, false), null);
   assert.equal(surface([25, 30, 35, 1], 100, false), null);
   assert.equal(surface([255, 0, 0, 1], 100, false), null);

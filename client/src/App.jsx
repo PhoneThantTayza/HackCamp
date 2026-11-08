@@ -146,7 +146,7 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
         {active.includes(option) && <>
         {option !== "Dark page theme" && <>
           <div className="colour-strength"><label htmlFor={`light-strength-${index}`}>Strength<span className="sr-only"> for {option}</span></label><output htmlFor={`light-strength-${index}`}>{strengths[option]}%</output></div>
-          <input id={`light-strength-${index}`} className="colour-range" type="range" min="0" max="100" step="5" value={strengths[option]} onChange={event => onStrengthChange({ ...strengths, [option]: Number(event.target.value) })} />
+          <input id={`light-strength-${index}`} className="colour-range" type="range" min="0" max="200" step="5" value={strengths[option]} onChange={event => onStrengthChange({ ...strengths, [option]: Number(event.target.value) })} />
         </>}
         <LightSensitivitySample option={option} strengths={strengths} enabled={enabled} />
         </>}
