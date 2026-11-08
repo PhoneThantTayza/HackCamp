@@ -1,4 +1,7 @@
+import "../public/focus-mode.js";
+export const focusMode = globalThis.clearspaceFocusMode;
 import { emptyDyslexia, restoreDyslexia } from "./dyslexia-settings.js";
+
 import "../public/color-vision.js";
 import "../public/low-vision.js";
 import "../public/light-sensitivity.js";
@@ -9,12 +12,12 @@ export const lowVision = globalThis.clearspaceLowVision;
 export const colorVision = globalThis.clearspaceColorVision;
 export const lowVisionOptions = lowVision.options;
 export const dyslexia = globalThis.clearspaceDyslexia;
-export const unsupported = new Set(["Reading guide", "Simplified layout", "Hide distractions", "Clear headings", "Shorter paragraphs"]);
-export const defaults = { version: 1, enabled: true, selected: [], light: false, colorVision: colorVision.normalize(), lowVision: lowVision.normalize(), lightSensitivity: lightSensitivity.normalize(), dyslexia: emptyDyslexia() };
+export const unsupported = new Set(["Reading guide", "Simplified layout", "Clear headings", "Shorter paragraphs"]);
+export const defaults = { version: 1, enabled: true, selected: [], light: false, colorVision: colorVision.normalize(), lowVision: lowVision.normalize(), lightSensitivity: lightSensitivity.normalize(), focusMode: focusMode.normalize(), dyslexia: emptyDyslexia() };
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id && globalThis.chrome?.storage);
 export async function loadSettings() {
   const saved = isExtension ? (await chrome.storage.local.get("settings")).settings : JSON.parse(localStorage.getItem("clearspace-demo") || "null");
-  return { ...defaults, ...saved, colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
+  return { ...defaults, ...saved, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
 }
 export async function saveSettings(settings) {
   if (isExtension) await chrome.storage.local.set({ settings });
@@ -33,7 +36,7 @@ export async function applyToTarget() {
     throw new Error("Settings saved, but no website is connected. Open the website you want to adjust, click the Clearspace toolbar icon, then Save and apply. Or select Allow site access here to apply automatically.");
   }
   const results = await Promise.allSettled([...targetIds].map(async tabId => {
-    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "dyslexia.js", "selection-reader.js", "content.js"] });
+    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], world: "ISOLATED" });
     const main = injected.find(frame => frame.frameId === 0);
     // Verify explicitly instead of relying on the completion value of a batch
     // of script files. Pin verification to the injected document if available.
@@ -55,10 +58,10 @@ export async function applyToTarget() {
     // Reduce motion, click targets, button spacing + keyboard focus add-ons; failures here must not affect the content.js result.
     await Promise.allSettled([
       chrome.scripting.executeScript({ target: { tabId }, files: ["motion-main.js"], world: "MAIN" }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["motion.js"] }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["click-targets.js"] }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["button-spacing.js"] }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["keyboard-focus.js"] })
+      chrome.scripting.executeScript({ target: { tabId }, files: ["motion.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["click-targets.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["button-spacing.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["keyboard-focus.js"], world: "ISOLATED" })
     ]);
     if (!frames.some(frame => frame.frameId === 0 && frame.result?.applied === true)) {
       throw new Error(frames.find(frame => frame.frameId === 0)?.result?.error || "The webpage did not confirm the adjustments. It may have navigated or closed; click Clearspace on the webpage again.");

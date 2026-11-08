@@ -8,6 +8,10 @@
 // Turning it OFF puts everything back.
 
 (() => {
+const storage = globalThis.chrome?.storage;
+if (!storage?.local?.get || !storage?.onChanged?.addListener) {
+  return { applied: false, error: "Extension storage is unavailable. Reload Clearspace and refresh this webpage." };
+}
 // Injected by both registerContentScripts and executeScript: run only once per frame.
 if (globalThis.a11yfixMotionLoaded) return;
 globalThis.a11yfixMotionLoaded = true;
@@ -255,10 +259,21 @@ function apply(settings) {
   else turnOff();
 }
 
-chrome.storage.local.get("settings").then(({ settings }) => apply(settings));
-
-// When the user selects "Save and apply", update the page right away
-chrome.storage.onChanged.addListener((changes, area) => {
+// Keep asynchronous storage failures out of Chrome's uncaught-error log and
+// allow a later injection to retry startup instead of leaving a loaded flag.
+const onStorageChange = (changes, area) => {
   if (area === "local" && changes.settings) apply(changes.settings.newValue);
-});
+};
+return (async () => {
+  try {
+    storage.onChanged.addListener(onStorageChange);
+    const { settings } = await storage.local.get("settings");
+    apply(settings);
+    return { applied: true };
+  } catch (error) {
+    try { storage.onChanged.removeListener?.(onStorageChange); } catch { /* Context may already be invalidated. */ }
+    globalThis.a11yfixMotionLoaded = false;
+    return { applied: false, error: error.message };
+  }
+})();
 })();
