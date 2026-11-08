@@ -111,7 +111,20 @@ function Reader({ state, action, error }) {
 
 function Connections({ state, action, change }) {
   const [browser, setBrowser] = useState('chrome'), [extensionId, setExtensionId] = useState(''), [message, setMessage] = useState('');
+  const account = state.account || {};
   return <>
+    <section className="panel"><h2>Account</h2>
+      <p>Sign in with Auth0 to keep your accessibility settings the same on every computer. Only your settings are saved — never what you read or which apps you use.</p>
+      {account.signedIn ? <>
+        <p><strong>Signed in{account.name ? ` as ${account.name}` : ''}</strong>{account.email ? ` (${account.email})` : ''}</p>
+        <p role="status">{account.syncing ? 'Syncing…' : account.error ? `Sync problem: ${account.error}` : account.lastSynced ? `Synced at ${new Date(account.lastSynced).toLocaleTimeString()}` : 'Not synced yet.'}</p>
+        <div><button className="primary" disabled={account.syncing} onClick={() => action(() => bridge.syncNow())}>Sync now</button> <button onClick={() => action(() => bridge.logout())}>Sign out</button></div>
+      </> : <>
+        {account.error && <p role="alert">{account.error}</p>}
+        <div><button className="primary" disabled={account.syncing} onClick={() => action(() => bridge.login())}>Sign in with Auth0</button></div>
+        <p>Your browser will open the Auth0 login page. Come back here when it says you are signed in.</p>
+      </>}
+    </section>
     <section className="panel"><h2>Desktop detection</h2><p>Recognize the active app and follow accessible controls. App names and focus positions stay in memory. Text is read only when you use the reading shortcut.</p>
       <Toggle label="Detect the active application" checked={state.preferences.desktop.detectApps} scope="Desktop" onChange={detectApps => change({ desktop: { ...state.preferences.desktop, detectApps } })} />
       {state.platform === 'darwin' && <div className="notice"><strong>{state.accessibility ? 'Accessibility access is available.' : 'Allow Accessibility access for focus outlines and selected text.'}</strong><p>macOS may list the development helper as clearspace-native. Enable it in Privacy & Security → Accessibility.</p><button onClick={() => action(() => bridge.requestAccessibility())}>Request Accessibility access</button><button onClick={() => action(() => bridge.openSystemSettings('accessibility'))}>Open system settings</button></div>}

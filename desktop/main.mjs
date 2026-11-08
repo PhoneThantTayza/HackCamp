@@ -6,6 +6,7 @@ import { loadPreferences, atomicJSON } from './store.mjs';
 import { NativeClient } from './native-client.mjs';
 import { SystemEffects } from './system-effects.mjs';
 import { installCompanion } from './companion.mjs';
+import { Auth } from './auth.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 app.setName('Clearspace');
@@ -26,6 +27,7 @@ let context = {}, contextAt = 0, lastExternalApp = null, reader = { text: '', so
 let warning = loaded.error || '', nativeError = '', nativeColour = false;
 let shortcutStatus = [], systemEffects;
 const overlays = new Map();
+let auth, account = { syncing: false, lastSynced: null, error: '' }, uploadTimer;
 const executable = path.join(app.isPackaged ? process.resourcesPath : path.resolve('build'), 'native', process.platform === 'win32' ? 'clearspace-native.exe' : 'clearspace-native');
 const companionPath = path.join(app.isPackaged ? process.resourcesPath : path.resolve('build'), 'companion');
 const assets = path.resolve(here, '../dist');
@@ -36,7 +38,8 @@ function getState() {
     accessibility: context.accessibility === true, nativeAvailable: !!native?.child,
     nativeColour, effects: systemEffects?.status, dark: nativeTheme.shouldUseDarkColors, warning, nativeError, shortcuts: shortcutStatus,
     excluded: preferences.desktop.excludedApps.includes(context.app?.id), reader,
-    detection: preferences.desktop.detectApps, displays: screen.getAllDisplays().length };
+    detection: preferences.desktop.detectApps, displays: screen.getAllDisplays().length,
+    account: { signedIn: !!auth?.user, ...(auth?.user || {}), ...account } };
 }
 function broadcast() {
   for (const win of [mainWindow, readerWindow]) if (win && !win.isDestroyed()) win.webContents.send('desktop:state-changed', getState());
@@ -58,7 +61,29 @@ function save(next) {
   if (!preferences.desktop.detectApps) { context = {}; lastExternalApp = null; contextAt = 0; }
   native?.send({ command: 'watch', enabled: preferences.desktop.detectApps });
   updateSystemEffects(); snapshot(); updateTray(); broadcast();
+  if (auth?.user && !applyingRemote) { clearTimeout(uploadTimer); uploadTimer = setTimeout(() => upload().catch(() => {}), 1500); }
   return getState();
+}
+
+// ---------- Auth0 account + settings sync ----------
+// Only the accessibility settings are synced. Desktop-only things (app list, detection) stay on this computer.
+let applyingRemote = false;
+const syncable = () => { const { desktop, ...rest } = preferences; return rest; };
+async function runSync(task) {
+  account = { ...account, syncing: true, error: '' }; broadcast();
+  try { await task(); account = { ...account, lastSynced: Date.now() }; }
+  catch (error) { account = { ...account, error: error.message }; }
+  finally { account = { ...account, syncing: false }; broadcast(); }
+  return getState();
+}
+async function upload() { return runSync(() => auth.api('PUT', { settings: syncable() })); }
+async function download() {
+  return runSync(async () => {
+    const { settings } = await auth.api('GET');
+    if (!settings) return auth.api('PUT', { settings: syncable() }); // first time: upload ours
+    applyingRemote = true;
+    try { save({ ...settings, desktop: preferences.desktop }); } finally { applyingRemote = false; }
+  });
 }
 function secureWindow(win) {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -178,6 +203,14 @@ if (singleInstance) app.whenReady().then(async () => {
   handle('desktop:state', getState);
   handle('desktop:save', value => save(value));
   handle('desktop:reset', () => save(normalizePreferences()));
+  auth = new Auth(path.join(app.getPath('userData'), 'account.bin'));
+  handle('desktop:login', async () => {
+    try { await auth.login(); } catch (error) { account = { ...account, error: error.message }; broadcast(); return getState(); }
+    return download();
+  });
+  handle('desktop:logout', () => { auth.logout(); account = { syncing: false, lastSynced: null, error: '' }; broadcast(); return getState(); });
+  handle('desktop:sync', () => download());
+  if (auth.user && !smoke) download();
   handle('desktop:reader', () => { showReader(); return reader; });
   handle('desktop:set-reader', text => {
     if (typeof text !== 'string' || text.length > 32768) throw new Error('Use a passage under 32,768 characters.');

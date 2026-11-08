@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('clearspaceDesktop', {
   requestScreenCapture: () => ipcRenderer.invoke('desktop:capture-permission'),
   installCompanion: (browser, extensionId) => ipcRenderer.invoke('desktop:install-companion', { browser, extensionId }),
   showCompanion: () => ipcRenderer.invoke('desktop:show-companion'),
+  login: () => ipcRenderer.invoke('desktop:login'),
+  logout: () => ipcRenderer.invoke('desktop:logout'),
+  syncNow: () => ipcRenderer.invoke('desktop:sync'),
   onState: subscribe('desktop:state-changed'),
   onReader: subscribe('desktop:reader-changed'),
 });
