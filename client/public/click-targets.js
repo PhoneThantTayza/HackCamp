@@ -1,10 +1,10 @@
 // Clearspace - Larger click targets
 // When "Larger click targets" is ON, one <style> tag makes controls at least
-// 44x44px (WCAG 2.5.5), enlarges checkboxes/radios to ~24px and pads small
+// 48x48px (above WCAG 2.5.5 44px), enlarges checkboxes/radios to ~28px and pads small
 // icon buttons. Links inside running text are left alone so paragraphs don't
 // break apart; only standalone links (menus, "Read more", icon links) grow.
 // Turning it OFF removes the tag and the link markers.
-// content.js has a smaller rule for the same option; the two agree (44px minimum).
+// content.js has a smaller rule for the same option; ours is the larger one (48px vs 44px).
 
 (() => {
 // Injected by both registerContentScripts and executeScript: run only once per frame.
@@ -19,9 +19,9 @@ const CSS = `
   input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
   [role=button], [role=link], [role=checkbox], [role=tab], [role=menuitem],
   a[${LINK_ATTR}] {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    padding: max(6px, 0.4em) max(10px, 0.6em) !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: max(10px, 0.6em) max(16px, 0.9em) !important;
     box-sizing: border-box !important;
   }
   a[${LINK_ATTR}="inline"] {
@@ -30,17 +30,17 @@ const CSS = `
     align-items: center !important;
   }
   input[type=checkbox], input[type=radio] {
-    width: 24px !important;
-    height: 24px !important;
-    min-width: 24px !important;
-    min-height: 24px !important;
-    margin: 10px !important; /* 24px box + margin = 44px target */
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    margin: 10px !important; /* 28px box + margin = 48px target */
   }
   /* Small icon buttons: a single icon and no text */
   :is(button, [role=button], a[${LINK_ATTR}]):has(> :is(svg, img, i, span:empty):only-child) {
-    padding: 10px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
+    padding: 12px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
   }
 `;
 
