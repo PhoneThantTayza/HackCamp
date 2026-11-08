@@ -1,10 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
-import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, isFirefox, extensionApi, loadSettings, saveSettings, applyToTarget } from "./settings.js";
-=======
 import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { getAccount, signIn, signOut, downloadSettings, uploadSettings, callbackUrl } from "./account.js";
->>>>>>> ea34cc00c5b3cd3b21a52c0dac436df19c44da5b
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
 import CombinedPreview from "./CombinedPreview.jsx";
