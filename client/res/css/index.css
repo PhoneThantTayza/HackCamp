@@ -131,6 +131,9 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .dyslexia-choice-summary::-webkit-details-marker { display: none; }
 .dyslexia-choice-summary > .option-row { padding: 9px 0; margin: 0; }
 .dyslexia-choice-summary:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+.dyslexia-choice-summary > .option-row { flex: 1; min-width: 0; }
+.dyslexia-label-copy { min-width: 0; overflow-wrap: anywhere; }
+.dyslexia-live-label { display: block; }
 .dyslexia-choice-content { padding: 0 0 12px 23px; }
 .dyslexia-choice-content .dyslexia-help { margin: 0; }
 .dyslexia-choice-content .dyslexia-help:first-child { margin-top: 8px; }

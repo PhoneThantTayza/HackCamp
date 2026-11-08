@@ -158,7 +158,28 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
   </div>;
 }
 
+function DyslexiaLabel({ id, label, value, active, interacting }) {
+  const host = useRef(null);
+  useEffect(() => {
+    const root = host.current.shadowRoot ?? host.current.attachShadow({ mode: 'open' });
+    const text = document.createElement('p');
+    text.style.margin = '0';
+    text.textContent = label;
+    root.append(text);
+    const controller = globalThis.clearspaceDyslexia.createController(root);
+    if (active) controller.apply({
+      experiences: { [id]: true },
+      // Avoid the engine's document-wide contrast scan in a local preview.
+      customization: { ...value.customization, allTextContrast: false,
+        ...(!interacting ? { guide: false, wordHighlight: false, focusParagraph: false } : {}) },
+    });
+    return () => { controller.reset(); text.remove(); };
+  }, [id, label, active, interacting, value.customization]);
+  return <span ref={host} className="dyslexia-live-label" />;
+}
+
 function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
+  const [previewChoice, setPreviewChoice] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
   const [expandedChoices, setExpandedChoices] = useState(() => ({ ...value.experiences }));
   const custom = value.customization;
@@ -222,7 +243,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
         <div id={sectionId} hidden={!expanded}>
         {section.choices.map(([id, label, help, unavailable]) => <details key={id} className="dyslexia-choice" open={expandedChoices[id] === true}
           onToggle={event => { const expanded = event.currentTarget.open; setExpandedChoices(current => current[id] === expanded ? current : { ...current, [id]: expanded }); }}>
-          <summary className="dyslexia-choice-summary">
+          <summary className="dyslexia-choice-summary"
+            onPointerEnter={() => setPreviewChoice(id)} onPointerLeave={() => setPreviewChoice(null)}
+            onFocusCapture={() => setPreviewChoice(id)}
+            onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPreviewChoice(null); }}>
             <label className="option-row" htmlFor={`dyslexia-${id}`}>
               <input id={`dyslexia-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
                 onChange={event => {
@@ -230,7 +254,10 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
                   setExpandedChoices(current => ({ ...current, [id]: checked }));
                   onChange({ ...value, enabled: true, experiences: { ...value.experiences, [id]: checked } });
                 }} />
-              <span>{label}<small className="muted block">{help}</small></span>
+              <span className="dyslexia-label-copy"><DyslexiaLabel id={id} label={label} value={value}
+                interacting={previewChoice === id}
+                active={!unavailable && (previewChoice === id || value.experiences[id] === true)} />
+                <small className="muted block">{help}</small></span>
             </label>
             <span className={`chevron ${expandedChoices[id] ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
           </summary>
