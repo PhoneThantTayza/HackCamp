@@ -5,6 +5,8 @@
 //   3. stops videos from playing by themselves (you can still press play)
 //   4. freezes animated GIFs
 //   5. pauses JavaScript animations and <marquee> scrolling text
+// The Motor slider picks how much of this runs (settings.motor.motion):
+//   Gentle = 1 + 2 · Calm = also 3 + 5 · Still = everything (default)
 // Turning it OFF puts everything back.
 
 (() => {
@@ -18,8 +20,16 @@ globalThis.a11yfixMotionLoaded = true;
 
 const STYLE_ID = "a11yfix-motion-style";
 
+// 1 Gentle, 2 Calm, 3 Still - same thresholds as motor-levels.js (keep them in sync)
+let level = 3;
+function readLevel(settings) {
+  const value = Number(settings?.motor?.motion);
+  if (!Number.isFinite(value)) return 3;
+  return value < 34 ? 1 : value < 67 ? 2 : 3;
+}
+
 // ---------- 1 + 2: CSS that stops animations, transitions and smooth scroll ----------
-const MOTION_CSS = `
+const BASE_CSS = `
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -28,6 +38,8 @@ const MOTION_CSS = `
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
+`;
+const GIF_CSS = `
   /* Hide moving images the INSTANT they appear, so they never visibly move.
      The frozen still picture (a canvas) is shown in their place. */
   img[src*=".gif"], img[src*="an_webp"] {
@@ -39,7 +51,7 @@ function addMotionStyle() {
   if (document.getElementById(STYLE_ID)) return; // already added
   const style = document.createElement("style");
   style.id = STYLE_ID;
-  style.textContent = MOTION_CSS;
+  style.textContent = level >= 3 ? BASE_CSS + GIF_CSS : BASE_CSS; // GIF hiding only at Still
   document.documentElement.appendChild(style);
 }
 
@@ -189,9 +201,8 @@ function onPageChanged() {
   pending = true;
   setTimeout(() => {
     pending = false;
-    pauseAutoplayVideos();
-    freezeAllGifs();
-    pauseScriptAnimations();
+    if (level >= 2) { pauseAutoplayVideos(); pauseScriptAnimations(); }
+    if (level >= 3) freezeAllGifs();
   }, 300);
 }
 
@@ -201,17 +212,18 @@ let isOn = false;
 function turnOn() {
   if (isOn) return;
   isOn = true;
-  document.documentElement.dataset.a11yfixReduceMotion = "on"; // tells motion-main.js
   addMotionStyle();
-  document.addEventListener("pointerdown", rememberUserAction, true);
-  document.addEventListener("keydown", rememberUserAction, true);
-  document.addEventListener("play", onVideoPlay, true); // "true" catches it for every video on the page
-  document.addEventListener("loadstart", onVideoLoad, true);
+  if (level >= 2) { // Calm and Still also stop videos playing by themselves
+    document.documentElement.dataset.a11yfixReduceMotion = "on"; // tells motion-main.js
+    document.addEventListener("pointerdown", rememberUserAction, true);
+    document.addEventListener("keydown", rememberUserAction, true);
+    document.addEventListener("play", onVideoPlay, true); // "true" catches it for every video on the page
+    document.addEventListener("loadstart", onVideoLoad, true);
+  }
 
   const start = () => {
-    pauseAutoplayVideos();
-    freezeAllGifs();
-    pauseScriptAnimations();
+    if (level >= 2) { pauseAutoplayVideos(); pauseScriptAnimations(); }
+    if (level >= 3) freezeAllGifs();
     observer = new MutationObserver(onPageChanged);
     // watch for new things AND for pictures being swapped (src changes)
     observer.observe(document.documentElement, {
@@ -255,6 +267,9 @@ function wantsReduceMotion(settings) {
 }
 
 function apply(settings) {
+  const newLevel = readLevel(settings);
+  if (isOn && newLevel !== level) turnOff(); // slider moved: restart at the new level
+  level = newLevel;
   if (wantsReduceMotion(settings)) turnOn();
   else turnOff();
 }

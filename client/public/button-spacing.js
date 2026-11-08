@@ -1,6 +1,6 @@
 // Clearspace - Extra button spacing
 // When "Extra button spacing" is ON, one <style> tag adds clear space AROUND
-// buttons, form controls and standalone links (menus, "hide | comments" rows),
+// buttons, form controls and standalone links (12-40px, set by the Motor slider) (menus, "hide | comments" rows),
 // so a shaky hand is less likely to hit the neighbour by mistake.
 // Links inside sentences are left alone so paragraphs keep their shape.
 // Turning it OFF removes the tag and the link markers.
@@ -20,27 +20,31 @@ const LINK_ATTR = "data-clearspace-spacing-link"; // "block" or "inline"
 
 // ":root" makes these rules win over "Larger click targets" (which uses a
 // smaller 4px margin) when both options are on.
-const CSS = `
+// Builds the CSS for a gap in px (12-40, from the Motor slider)
+const buildCss = (gap) => {
+  const half = Math.round(gap / 2); // each neighbour gives half the gap
+  return `
   :root :is(
     button, select, textarea,
     input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
     [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox],
     a[${LINK_ATTR}]
   ) {
-    margin: 10px !important; /* 20px of clear space between neighbours */
+    margin: ${half}px !important; /* = the chosen gap between neighbours */
   }
   :root a[${LINK_ATTR}="inline"] {
     /* margins above/below do nothing on plain inline links */
     display: inline-block !important;
   }
   :root input:is([type=checkbox], [type=radio]) {
-    margin: 10px 12px !important;
+    margin: ${half}px ${half + 2}px !important;
   }
   /* Menus and toolbars built from list items: space the items apart */
   :root :is(nav, [role=menu], [role=menubar], [role=tablist], [role=toolbar]) li {
-    margin: 6px !important;
+    margin: ${Math.round(half / 2)}px !important;
   }
 `;
+};
 
 // ---------- standalone vs. in-text links ----------
 // A link is "in text" only if a REAL WORD sits right next to it, like
@@ -106,7 +110,7 @@ function turnOn() {
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement("style");
     style.id = STYLE_ID;
-    style.textContent = CSS;
+    style.textContent = buildCss(currentGap);
     document.documentElement.appendChild(style);
   }
   const start = () => {
@@ -136,7 +140,18 @@ function wantsSpacing(settings) {
   return settings.selected.some((item) => typeof item === "string" && item.split(":")[1] === "Extra button spacing");
 }
 
+let currentGap = 26;
+
+// Read the slider value (settings.motor.spacing) and update the CSS live
+function setGap(settings) {
+  currentGap = globalThis.clearspaceMotor?.gapPx(settings?.motor?.spacing) ?? 26;
+  if (!isOn) return; // nothing on the page to update while the option is off
+  const style = document.getElementById(STYLE_ID);
+  if (style) style.textContent = buildCss(currentGap);
+}
+
 function apply(settings) {
+  setGap(settings);
   if (wantsSpacing(settings)) turnOn();
   else turnOff();
 }
