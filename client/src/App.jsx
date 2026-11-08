@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
+import { getAccount, signIn, signOut, downloadSettings, uploadSettings, callbackUrl } from "./account.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
 import CombinedPreview from "./CombinedPreview.jsx";
@@ -470,9 +471,40 @@ export default function App() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [speechReset, setSpeechReset] = useState(0);
-  useEffect(() => { loadSettings().then(settings => {
+  function showSettings(settings) {
     setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setMotorSettings(settings.motor); setReady(true);
-  }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
+  }
+  useEffect(() => { loadSettings().then(showSettings).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
+  // ---------- Auth0 account (optional) ----------
+  const [account, setAccount] = useState(null);
+  const [accountStatus, setAccountStatus] = useState("");
+  const accountRef = useRef(null);
+  useEffect(() => { getAccount().then(value => { accountRef.current = value; setAccount(value); }).catch(() => {}); }, []);
+  async function sync(settings) {
+    if (!accountRef.current) return;
+    setAccountStatus("Syncing…");
+    try { await uploadSettings(settings); setAccountStatus(`Synced at ${new Date().toLocaleTimeString()}`); }
+    catch (error) { setAccountStatus(`Sync problem: ${error.message}`); if (!(await getAccount())) { accountRef.current = null; setAccount(null); } }
+  }
+  async function handleSignIn() {
+    setAccountStatus("Opening Auth0 sign-in…");
+    try {
+      const value = await signIn();
+      accountRef.current = value; setAccount(value);
+      const remote = await downloadSettings();
+      if (remote) {
+        // Your saved settings win: load them here and apply them to websites.
+        await saveSettings(remote);
+        const loaded = await loadSettings();
+        lastSettings.current = null; showSettings(loaded);
+        await applyToTarget().catch(() => {});
+        setAccountStatus(`Your saved settings were loaded. Synced at ${new Date().toLocaleTimeString()}`);
+      } else {
+        await sync(await loadSettings()); // first time: save this browser's settings to your account
+      }
+    } catch (error) { setAccountStatus(error.message); }
+  }
+  async function handleSignOut() { await signOut(); accountRef.current = null; setAccount(null); setAccountStatus("Signed out. Your settings stay on this browser."); }
   useEffect(() => {
     if (!ready) return;
     const settings = { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia, motor: motorSettings };
@@ -489,6 +521,7 @@ export default function App() {
       if (revision !== saveRevision.current) return;
       try {
         await saveSettings(settings);
+        void sync(settings); // signed in: also save to your Auth0 account
         const message = await applyToTarget();
         if (revision === saveRevision.current) setStatus(message);
       } catch (error) {
@@ -539,6 +572,19 @@ export default function App() {
       </section>
 
       {ready && (sidePanel ? <details className="panel-preview"><summary>Try a sample page<span className="muted">Preview your adjustments</span></summary>{preview}</details> : preview)}
+
+      {isExtension && <section className="extension-controls account-section" aria-labelledby="account-title">
+        <div className="browsing-controls"><div className="controls-actions">
+          <div className="reset-copy"><h3 id="account-title" className="text-sm font-medium">{account ? `Signed in${account.name ? ` as ${account.name}` : ""}` : "Keep your settings everywhere"}</h3>
+            <p className="muted control-description">{account ? account.email : "Optional. Sign in with Auth0 to save your preferences to your account and get them back on any computer. Only your settings are saved."}</p></div>
+          {account
+            ? <div className="flex gap-2"><button type="button" className="secondary-button" onClick={async () => sync(await loadSettings())}>Sync now</button><button type="button" className="secondary-button" onClick={handleSignOut}>Sign out</button></div>
+            : <button type="button" className="secondary-button" disabled={!ready} onClick={handleSignIn}>Sign in with Auth0<Icon name="arrow" size={15} /></button>}
+        </div>
+        {!account && <details className="controls-help muted"><summary>Setting up Auth0?</summary><p>Add <code>{callbackUrl()}</code> to Allowed Callback URLs in your Auth0 application, and run <code>npm run dev</code> for the sync server.</p></details>}
+        </div>
+        <p role="status" className={accountStatus ? "controls-feedback text-sm" : ""}>{accountStatus}</p>
+      </section>}
 
       <section className="extension-controls" aria-label="Browsing controls">
         {!isExtension && <p className="optional-tag mb-4">LOCAL UI DEMO — does not adjust websites</p>}
