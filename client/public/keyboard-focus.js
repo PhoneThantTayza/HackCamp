@@ -10,7 +10,7 @@
 // the ":root" rules here are stronger, so this ring wins when both are on.
 
 (() => {
-const storage = globalThis.chrome?.storage;
+const storage = (globalThis.clearspacePreviewApi ?? globalThis.chrome)?.storage;
 if (!storage?.local?.get || !storage?.onChanged?.addListener) {
   return { applied: false, error: "Extension storage is unavailable. Reload Clearspace and refresh this webpage." };
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { defaults, motor, focusMode, colorVision, lowVision, lowVisionOptions, lightSensitivity, lightSensitivityOptions, unsupported, isExtension, loadSettings, saveSettings, applyToTarget } from "./settings.js";
 import { emptyDyslexia, restoreDyslexia, dyslexiaChoiceCount } from "./dyslexia-settings.js";
 import ReadAloud from "./ReadAloud.jsx";
+import CombinedPreview from "./CombinedPreview.jsx";
 import DyslexiaSlider from './DyslexiaSlider.jsx';
 
 const groups = [
@@ -52,7 +53,7 @@ function ColourVisionControls({ value, onChange, enabled }) {
       <p className="colour-label">Live colour sample{!enabled && " · adjustments paused"}</p>
       {[false, true].map(adjusted => <div key={String(adjusted)} className="colour-sample-row"><span className="muted">{adjusted ? "Your settings" : "Original"}</span><div className="colour-swatches" style={{ filter: adjusted && filtered ? "url(#clearspace-sample-colour)" : "none" }}>{samples.map(([colour, name, shape]) => <div key={name} className="colour-swatch"><span style={{ backgroundColor: colour }} aria-hidden="true">{shape}</span><small>{name}</small></div>)}</div></div>)}
     </div>
-    <p id="colour-limit" className="muted control-caption">Colour remapping affects the whole page, including images. Results vary; this is assistance, not a simulation or a correction. The sample updates now; save to apply to your webpage.</p>
+    <p id="colour-limit" className="muted control-caption">Colour remapping affects the whole page, including images. Results vary; this is assistance, not a simulation or a correction. Changes save and apply to connected webpages automatically.</p>
     </>}
     </div>
   </div>;
@@ -99,7 +100,7 @@ function LowVisionControls({ selected, onToggle, enabled, strengths, onStrengthC
   return <div className="low-vision-controls">
     <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls="low-vision-options" onClick={() => setOpen(!open)}><span>Low vision</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
     <div id="low-vision-options" hidden={!open}>
-      <p className="muted control-description">Choose what makes webpages easier to see. Save to apply across websites with site access.</p>
+      <p className="muted control-description">Choose what makes webpages easier to see. Changes apply automatically across websites with site access.</p>
       {lowVisionOptions.map((option, index) => <div key={option} className="low-vision-option">
         <label className="option-row"><input type="checkbox" checked={selected.includes(`vision:${option}`)} onChange={() => onToggle(`vision:${option}`)} /><span>{option}<small className="muted block">{descriptions[index]}</small></span></label>
         {selected.includes(`vision:${option}`) && <>
@@ -108,7 +109,7 @@ function LowVisionControls({ selected, onToggle, enabled, strengths, onStrengthC
         <LowVisionSample strength={strengths[option]} kind={["size", "contrast", "links", "focus"][index]} active={selected.includes(`vision:${option}`)} enabled={enabled} />
         </>}
       </div>)}
-      <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
+      <p className="muted control-caption">Your choices save and apply to connected webpages automatically.</p>
     </div>
   </div>;
 }
@@ -154,7 +155,7 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
         <LightSensitivitySample option={option} strengths={strengths} enabled={enabled} />
         </>}
       </div>)}
-      <p className="muted control-caption">Samples update now; save to apply to your webpage. Dim page adjusts webpage content, not your screen brightness. Website styling can affect results.</p>
+      <p className="muted control-caption">Changes save and apply to connected webpages automatically. Dim page adjusts webpage content, not your screen brightness. Website styling can affect results.</p>
     </div>
   </div>;
 }
@@ -173,7 +174,7 @@ function FocusModeControls({ value, onChange, enabled }) {
       <button type="button">Sample control</button>
       {enabled && <div className="focus-sample-shade" aria-hidden="true" style={{ background: focusMode.background(value, center) }} />}
     </div>
-    <p className="muted control-caption">Sample updates now; save to apply to your webpage. At 0% dimming, the page stays unchanged.</p>
+    <p className="muted control-caption">Changes save and apply to connected webpages automatically. At 0% dimming, the page stays unchanged.</p>
   </div>;
 }
 
@@ -309,6 +310,7 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query, mutual
         </div>
       </section>; })}
       {!filtered.length && <p className="muted text-xs">No matching experiences.</p>}
+      <p className="muted dyslexia-help mt-3">Changes save and apply to connected webpages automatically.</p>
   </div>;
 }
 
@@ -430,7 +432,7 @@ function AccessibilityCard({ group, motorSettings, onMotorChange, selected, onTo
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
       {group.id === "motor" && options.length > 0 && <MotorControls options={options} selected={selected} onToggle={onToggle} value={motorSettings} onChange={onMotorChange} enabled={enabled} />}
       {group.id !== "motor" && options.map(option => <React.Fragment key={option}>
-        <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off and save to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
+        <label className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{option === "Hide distractions" && <small className="muted block">Hide ads across the page, plus sidebars, related content and share widgets. Some ads may escape detection. Turn off to restore hidden content.</small>}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>
         {group.id === "cognitive" && option === "Focus mode" && selected.includes("cognitive:Focus mode") && <FocusModeControls value={focusSettings} onChange={onFocusChange} enabled={enabled} />}
       </React.Fragment>)}
       {!options.length && !showColour && !showLowVision && !showLight && group.id !== "dyslexia" && <p className="muted text-xs py-2">No matching adjustments.</p>}
@@ -447,40 +449,56 @@ export default function App() {
   const [light, setLight] = useState(false);
   const [selected, setSelected] = useState([]);
   const [dyslexia, setDyslexia] = useState(emptyDyslexia);
-  const [enabled, setEnabled] = useState(true);
+  const enabled = true;
   const [colour, setColour] = useState(defaults.colorVision);
   const [lowVisionStrengths, setLowVisionStrengths] = useState(defaults.lowVision);
   const [motorSettings, setMotorSettings] = useState(defaults.motor);
   const [focusSettings, setFocusSettings] = useState(defaults.focusMode);
   const [lightStrengths, setLightStrengths] = useState(defaults.lightSensitivity);
   const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const saveQueue = useRef(Promise.resolve());
+  const lastSettings = useRef(null);
+  const saveRevision = useRef(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [speechReset, setSpeechReset] = useState(0);
   useEffect(() => { loadSettings().then(settings => {
-    setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setEnabled(settings.enabled); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setMotorSettings(settings.motor); setReady(true);
+    setFocusSettings(settings.focusMode); setLight(settings.light); setSelected(settings.selected); setDyslexia(restoreDyslexia(settings)); setColour(settings.colorVision); setLowVisionStrengths(settings.lowVision); setLightStrengths(settings.lightSensitivity); setMotorSettings(settings.motor); setReady(true);
   }).catch(() => setError("Could not load settings. Reopen Clearspace to retry.")); }, []);
-  function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeDyslexia(value) { const customization = { ...value.customization }; delete customization.guide; setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode')); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeColour(value) { setColour(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeMotor(value) { setMotorSettings(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeLowVision(value) { setLowVisionStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeLight(value) { setLightStrengths(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function changeFocus(value) { setFocusSettings(value); setStatus("Unsaved changes. Select Save and apply."); }
-  function clearChoices() { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setMotorSettings(defaults.motor); setStatus("Unsaved changes. Select Save and apply."); }
+  useEffect(() => {
+    if (!ready) return;
+    const settings = { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia, motor: motorSettings };
+    const snapshot = JSON.stringify(settings);
+    // Loading saved preferences must not overwrite them or trigger a new save.
+    if (lastSettings.current === null) { lastSettings.current = snapshot; return; }
+    if (lastSettings.current === snapshot) return;
+    lastSettings.current = snapshot;
+    const revision = ++saveRevision.current;
+    setError("");
+    setStatus("Saving and applying…");
+    // Serialize writes and page updates; skip queued choices superseded by a newer edit.
+    saveQueue.current = saveQueue.current.then(async () => {
+      if (revision !== saveRevision.current) return;
+      try {
+        await saveSettings(settings);
+        const message = await applyToTarget();
+        if (revision === saveRevision.current) setStatus(message);
+      } catch (error) {
+        if (revision === saveRevision.current) { setStatus(""); setError(error.message); }
+      }
+    });
+  }, [ready, enabled, selected, light, colour, lowVisionStrengths, lightStrengths, focusSettings, dyslexia, motorSettings]);
+  function toggle(option) { setSelected(current => current.includes(option) ? current.filter(item => item !== option) : [...current, option]); }
+  function changeDyslexia(value) { const customization = { ...value.customization }; delete customization.guide; setDyslexia({ ...value, customization }); setSelected(current => current.filter(item => item !== 'cognitive:Focus mode')); }
+  function changeColour(value) { setColour(value); }
+  function changeMotor(value) { setMotorSettings(value); }
+  function changeLowVision(value) { setLowVisionStrengths(value); }
+  function changeLight(value) { setLightStrengths(value); }
+  function changeFocus(value) { setFocusSettings(value); }
+  function clearChoices() { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setMotorSettings(defaults.motor); }
+  function resetChoices() { clearChoices(); setSpeechReset(value => value + 1); }
   const choiceCount = selected.length + Number(colour.mode !== "off") + Number(colour.cues) + dyslexiaChoiceCount(dyslexia);
 
-  async function persist(reset = false) {
-    if (reset) setSpeechReset(value => value + 1);
-    setBusy(true); setError(""); setStatus("");
-    try {
-      await saveSettings(reset ? { ...defaults, light, dyslexia: emptyDyslexia() } : { version: 1, enabled, selected, light, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia, motor: motorSettings });
-      if (reset) { setFocusSettings(defaults.focusMode); setSelected([]); setDyslexia(emptyDyslexia()); setEnabled(true); setColour(defaults.colorVision); setLowVisionStrengths(defaults.lowVision); setLightStrengths(defaults.lightSensitivity); setMotorSettings(defaults.motor); }
-      setStatus(await applyToTarget());
-    } catch (error) { setError(error.message); }
-    finally { setBusy(false); }
-  }
   async function allowAutomatic() {
     setError("");
     try {
@@ -491,7 +509,7 @@ export default function App() {
   return <div className={`app ${light ? "light" : ""}`}>
     <header className="site-header flex items-center justify-between gap-4">
       <a href="#" className="brand flex items-center gap-2.5" aria-label="Clearspace home"><span className="brand-mark"><Icon name="spark" size={21} /></span>clearspace<span className="prototype-tag">BETA</span></a>
-      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that works for you.</span><button className="icon-button" disabled={!ready || busy} onClick={() => { setLight(!light); setStatus("Theme changed. Select Save and apply to remember it."); }} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
+      <div className="flex items-center gap-4"><span className="header-caption muted hidden sm:block">A web that works for you.</span><button className="icon-button" disabled={!ready} onClick={() => setLight(current => !current)} aria-label={`Switch to ${light ? "dark" : "light"} mode`}><Icon name={light ? "moon" : "sun"} /></button></div>
     </header>
 
     <main className="main-content w-full mx-auto">
@@ -506,35 +524,27 @@ export default function App() {
       <section className="accessibility-section" aria-labelledby="adjustments-title">
         <div className="flex items-center justify-between gap-3 mb-2"><h2 id="adjustments-title" className="text-sm font-medium">What would make browsing easier?</h2><span className="optional-tag">OPTIONAL</span></div>
         <p className="muted text-sm">Choose what works for you. You can mix and match.</p>
-        <fieldset disabled={!ready || busy} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} motorSettings={motorSettings} onMotorChange={changeMotor} focusSettings={focusSettings} onFocusChange={changeFocus} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
-        <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{choiceCount ? `${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.` : "No labels needed. Just choose the adjustments that help."}</span>{choiceCount > 0 && <button type="button" className="clear-button shrink-0" disabled={!ready || busy} onClick={clearChoices}>Clear all</button>}</div>
+        <fieldset disabled={!ready} className="adjustments-fieldset grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 mt-6 items-start">{groups.map(group => <AccessibilityCard key={group.id} group={group} motorSettings={motorSettings} onMotorChange={changeMotor} focusSettings={focusSettings} onFocusChange={changeFocus} selected={selected} onToggle={toggle} colour={colour} onColourChange={changeColour} lowVisionStrengths={lowVisionStrengths} onLowVisionChange={changeLowVision} lightStrengths={lightStrengths} onLightChange={changeLight} dyslexia={dyslexia} onDyslexiaChange={changeDyslexia} enabled={enabled} speechReset={speechReset} />)}</fieldset>
+        {choiceCount > 0 && <div className="selection-summary muted flex items-center justify-between gap-3 text-xs"><span>{`${choiceCount} preference${choiceCount === 1 ? "" : "s"} selected. Your space, your preferences.`}</span><button type="button" className="clear-button shrink-0" disabled={!ready} onClick={clearChoices}>Clear all</button></div>}
 
       </section>
 
-      <section className="extension-controls" aria-label="Extension controls">
+      {ready && <CombinedPreview settings={{ version: 1, enabled, selected, colorVision: colour, lowVision: lowVisionStrengths, lightSensitivity: lightStrengths, focusMode: focusSettings, dyslexia }} />}
+
+      <section className="extension-controls" aria-label="Browsing controls">
         {!isExtension && <p className="optional-tag mb-4">LOCAL UI DEMO — does not adjust websites</p>}
         <div className="browsing-controls">
-          <div className="controls-heading">
-            <div><h2 className="text-base font-medium">Your browsing preferences</h2><p id="adjustments-help" className="muted control-description">Choose adjustments below, then save to use them on your page.</p></div>
-            <label className="adjustments-switch">
-              <input type="checkbox" role="switch" aria-label="Enable webpage adjustments" aria-describedby="adjustments-help adjustments-off-help" checked={enabled} disabled={!ready || busy} onChange={event => { setEnabled(event.target.checked); setStatus("Unsaved changes. Select Save and apply."); }} />
-              <span className="switch-track" aria-hidden="true"><span /></span>
-              <span className="switch-label">{enabled ? "On" : "Off"}</span>
-            </label>
-          </div>
-          <p id="adjustments-off-help" className="muted control-description">Switch off and save to pause adjustments. Your choices stay remembered.</p>
           <div className="controls-actions">
-            <button type="button" className="preview-button controls-save" disabled={!ready || busy} onClick={() => persist()}>{busy ? "Saving…" : "Save and apply"}<Icon name="arrow" size={16} /></button>
-            <button type="button" className="secondary-button" aria-describedby="reset-help" disabled={!ready || busy} onClick={() => persist(true)}>Reset choices</button>
+            <div className="reset-copy"><h3 className="text-sm font-medium">Reset your preferences</h3><p className="muted control-description">Clear your choices and restore the default settings.</p></div>
+            <button type="button" className="secondary-button" disabled={!ready} onClick={resetChoices}>Reset choices</button>
           </div>
-          <p id="reset-help" className="muted control-caption">Reset clears your selections and removes their effects.</p>
           {isExtension && <div className="automatic-access">
             <span className="automatic-icon"><Icon name="spark" size={20} /></span>
-            <div className="automatic-copy"><h3 className="text-sm font-medium">Take your preferences with you</h3><p className="muted control-description">Allow site access to use saved adjustments automatically as you browse.</p></div>
-            <button type="button" className="secondary-button" disabled={!ready || busy} onClick={allowAutomatic}>Allow site access<Icon name="arrow" size={15} /></button>
+            <div className="automatic-copy"><h3 className="text-sm font-medium">Apply automatically as you browse</h3><p className="muted control-description">Allow site access to apply your saved adjustments to existing and newly opened websites. This is optional.</p></div>
+            <button type="button" className="secondary-button" disabled={!ready} onClick={allowAutomatic}>Allow site access<Icon name="arrow" size={15} /></button>
           </div>}
+          {isExtension && <details className="controls-help muted"><summary>How does site access work?</summary><p>To adjust one website, open it and click the Clearspace toolbar icon. To apply your choices automatically across websites, select Allow site access and accept Chrome's permission prompt. Chrome settings and other protected pages cannot be adjusted. You can review or revoke access in Chrome's Extensions → Clearspace → Details → Site access. Refresh adjusted pages after revoking access to remove any remaining effects.</p></details>}
         </div>
-        <details className="controls-help muted"><summary>How does site access work?</summary><p>Without automatic access, open a webpage and click the Clearspace extension icon first. Automatic access is optional and also covers new webpages. Browser settings pages and some protected pages cannot be adjusted. Manage site access in Chrome's extension Details page.</p></details>
         <p role="status" className={status ? "controls-feedback text-sm" : ""}>{status}</p>
         {error && <p role="alert" className="controls-feedback text-sm">{error}</p>}
       </section>
