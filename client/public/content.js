@@ -1,17 +1,40 @@
 (() => {
+  const storage = globalThis.chrome?.storage;
+  const storageError = "Clearspace's extension storage is unavailable. Reload Clearspace in chrome://extensions, refresh this webpage, then Save and apply again.";
+  if (!storage?.local?.get || !storage?.onChanged?.addListener) return { applied: false, error: storageError };
   // Return an acknowledgement only after the stored settings reach the page.
   // Otherwise executeScript can succeed while this asynchronous work fails.
-  const applySavedSettings = () => chrome.storage.local.get("settings")
-    .then(({ settings }) => {
-      globalThis.clearspaceApply(settings);
+  const applySavedSettings = async () => {
+    try {
+      const { settings } = await storage.local.get("settings");
+      await globalThis.clearspaceApply(settings);
       return { applied: true };
-    })
-    .catch(error => ({ applied: false, error: error.message }));
-  // Isolated-world guard prevents duplicate storage listeners on repeated Apply.
-  if (globalThis.clearspaceApply) {
+    } catch (error) {
+      return { applied: false, error: error.message };
+    }
+  };
+  // Reuse this revision on repeated Apply, but replace older page scripts so
+  // newly added adjustments work on tabs that were already connected.
+  const revision = "hide-distractions-4";
+  const previousApply = globalThis.clearspaceApply;
+  if (previousApply?.revision === revision) {
     return applySavedSettings();
   }
+  // Register before creating the new apply function. A failed registration
+  // must not leave a loaded marker that prevents the next injection retry.
+  if (!previousApply) {
+    try {
+      storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes.settings) globalThis.clearspaceApply(changes.settings.newValue);
+      });
+    } catch (error) {
+      return { applied: false, error: error.message };
+    }
+  }
+  // Let the previous closure remove its own effects before replacing it.
+  previousApply?.({ version: 1, enabled: false, selected: [] });
   let sheet;
+  let restoreFocus;
   let restoreContrast;
   let restoreSurfaces;
   let filterSvg;
@@ -26,7 +49,28 @@
     "Left-aligned text": "body :where(p, li, blockquote) { text-align: left !important; }",
     "Keyboard focus indicators": ":focus-visible { outline: 3px solid #005fcc !important; outline-offset: 3px !important; box-shadow: 0 0 0 6px #fff !important; }"
   };
+  // Match whole ad tokens and their conventional separators. A bare substring
+  // such as [class*="ad"] would also hide headers, downloads and padding utilities.
+  const adSelectors = [
+    ...["ad", "ads", "advert", "adverts", "advertisement", "advertisements", "advertising", "adslot", "adunit"].flatMap(token => [
+      `.${token}`, `#${token}`,
+      ...["-", "_"].flatMap(separator => [
+        `[id^="${token}${separator}" i]`, `[id$="${separator}${token}" i]`, `[id*="${separator}${token}${separator}" i]`,
+        `[class^="${token}${separator}" i]`, `[class*=" ${token}${separator}" i]`,
+        `[class$="${separator}${token}" i]`, `[class*="${separator}${token} " i]`, `[class*="${separator}${token}${separator}" i]`,
+      ]),
+    ]),
+    "[data-ad-slot]", "[data-ad-client]", "[data-ad-unit]", "[data-ad-unit-id]", "[data-advertisement]", "[data-google-query-id]",
+    "ins.adsbygoogle", '[id^="google_ads_iframe"]', '[id^="div-gpt-ad"]',
+    ".sponsored-content", ".sponsored-post", ".promoted-content", ".promoted-post",
+    '[aria-label="Advertisement" i]', '[aria-label="Advertisements" i]', '[aria-label="Ads" i]',
+    'iframe[title="Advertisement" i]', 'iframe[title="Advertising" i]',
+    ...["doubleclick.net/", "googlesyndication.com/", "googleadservices.com/", "amazon-adsystem.com/", "adnxs.com/"].map(host => `iframe[src*="${host}" i]`),
+    '[id^="taboola-"]', '[class~="OUTBRAIN"]', '[data-widget-id][data-ob-template]',
+  ];
   globalThis.clearspaceApply = settings => {
+    restoreFocus?.();
+    restoreFocus = undefined;
     restoreContrast?.();
     restoreContrast = undefined;
     restoreSurfaces?.();
@@ -39,6 +83,20 @@
     const names = new Set(settings.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || (lowVisionOptions.has(item.slice(7)) || globalThis.clearspaceLightSensitivity.options.includes(item.slice(7))))).map(item => item.split(":")[1]));
     // Apply low-vision rules last so their stronger link/focus cues win in combinations.
     let css = [...names].filter(name => !lowVisionOptions.has(name)).map(name => rules[name] || "").join("\n");
+    if (settings.selected.includes("cognitive:Hide distractions")) {
+      // Ad rules apply throughout the page, including inside articles and dialogs.
+      // CSS also covers ads inserted later without changing the site's DOM.
+      // Never hide a primary-content container that happens to have an ad token.
+      css += `\nbody :is(${adSelectors.join(",\n")}):not(main, [role="main"]):not(:has(main, [role="main"])) { display: none !important; }`;
+      // For general clutter, also preserve containers holding forms or dialogs.
+      css += `\nbody :is(
+        aside, [role="complementary"],
+        #sidebar, .sidebar, #left-sidebar, #right-sidebar, .left-sidebar, .right-sidebar,
+        #secondary, .widget-area,
+        #related-posts, .related-posts, .related-articles, .recommended-posts,
+        .social-share, .share-buttons, .sharing-buttons
+      ):not(main, [role="main"], form, dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"]):not(:has(main, [role="main"], form, dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"])) { display: none !important; }`;
+    }
     const lightOptions = [...names].filter(name => globalThis.clearspaceLightSensitivity.options.includes(name));
     const pageFilters = [];
     const lightFilters = globalThis.clearspaceLightSensitivity.filters(lightOptions, settings.lightSensitivity);
@@ -79,11 +137,10 @@
       sheet.replaceSync(css);
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
     }
+    if (settings.selected.includes("cognitive:Focus mode")) restoreFocus = globalThis.clearspaceFocusMode.apply(document, settings.focusMode);
     restoreSurfaces = globalThis.clearspaceLightSensitivity.applySurfaces(document.documentElement, lightOptions, settings.lightSensitivity);
     if (names.has("Higher contrast")) restoreContrast = globalThis.clearspaceLowVision.applyContrast(document.body, strengths["Higher contrast"]);
   };
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.settings) globalThis.clearspaceApply(changes.settings.newValue);
-  });
+  globalThis.clearspaceApply.revision = revision;
   return applySavedSettings();
 })();

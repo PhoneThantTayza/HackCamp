@@ -3,6 +3,61 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
+test("page scripts report unavailable storage without throwing or marking themselves loaded", async () => {
+  const files = ["content.js", "motion.js", "click-targets.js", "button-spacing.js", "keyboard-focus.js"];
+  for (const file of files) {
+    for (const chrome of [undefined, {}, { storage: {} }, { storage: { local: { get() {} } } }]) {
+      const context = vm.createContext({ chrome });
+      const result = await vm.runInContext(readFileSync(`client/public/${file}`, "utf8"), context);
+      assert.equal(result.applied, false, file);
+      assert.match(result.error, /storage.*unavailable/i);
+      assert.equal(context.clearspaceApply, undefined);
+      assert.equal(Object.keys(context).some(key => key.endsWith("Loaded")), false);
+    }
+  }
+});
+
+test("content startup handles synchronous invalidation and failed listener registration", async () => {
+  const source = readFileSync("client/public/content.js", "utf8");
+  let failRegistration = true;
+  const context = vm.createContext({ chrome: { storage: {
+    local: { get() { throw new Error("Extension context invalidated."); } },
+    onChanged: { addListener() { if (failRegistration) throw new Error("Listener context invalidated."); } },
+  } } });
+  const first = await vm.runInContext(source, context);
+  assert.equal(first.applied, false);
+  assert.match(first.error, /Listener context invalidated/);
+  assert.equal(context.clearspaceApply, undefined);
+  failRegistration = false;
+  const retry = await vm.runInContext(source, context);
+  assert.equal(retry.applied, false);
+  assert.match(retry.error, /Extension context invalidated/);
+});
+
+test("motor script storage failures remove their listener and allow reinjection", async () => {
+  for (const [file, flag] of [
+    ["motion.js", "a11yfixMotionLoaded"], ["click-targets.js", "clearspaceClickTargetsLoaded"],
+    ["button-spacing.js", "clearspaceButtonSpacingLoaded"], ["keyboard-focus.js", "clearspaceKeyboardFocusLoaded"],
+  ]) {
+    const listeners = new Set();
+    let failure = true;
+    const context = vm.createContext({ chrome: { storage: {
+      local: { get() { if (failure) throw new Error("Extension context invalidated."); return Promise.resolve({ settings: undefined }); } },
+      onChanged: { addListener(fn) { listeners.add(fn); }, removeListener(fn) { listeners.delete(fn); } },
+    } } });
+    const source = readFileSync(`client/public/${file}`, "utf8");
+    assert.equal((await vm.runInContext(source, context)).applied, false, file);
+    assert.equal(context[flag], false);
+    assert.equal(listeners.size, 0);
+    failure = false;
+    assert.equal((await vm.runInContext(source, context)).applied, true, file);
+    assert.equal(context[flag], true);
+    assert.equal(listeners.size, 1);
+    await vm.runInContext(source, context);
+    assert.equal(listeners.size, 1, "repeated injection must not duplicate listeners");
+  }
+});
+
 test("automatic access loads light sensitivity alongside the motor and motion scripts", async () => {
   const registrations = [];
   const injections = [];
@@ -19,7 +74,7 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
   } });
   vm.runInContext(readFileSync("client/public/background.js", "utf8"), context);
   await vm.runInContext("syncAutomaticAccess()", context);
-  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"];
+  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "content.js"];
   assert.deepEqual(Array.from(registrations.find(script => script.id === "clearspace-auto").js), core);
   assert.deepEqual(Array.from(injections.find(script => script.files.includes("content.js")).files), core);
   for (const file of ["motion-main.js", "motion.js", "click-targets.js", "button-spacing.js", "keyboard-focus.js"]) {
@@ -27,6 +82,8 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
     assert.ok(injections.some(script => script.files.includes(file) && script.target.allFrames));
   }
   assert.equal(registrations.find(script => script.js.includes("motion-main.js")).world, "MAIN");
+  assert.ok(registrations.filter(script => !script.js.includes("motion-main.js")).every(script => script.world === "ISOLATED"));
+  assert.ok(injections.filter(script => !script.files.includes("motion-main.js")).every(script => script.world === "ISOLATED"));
 });
 
 test("adaptive contrast is gradual, preserves readable colours and respects light/dark backgrounds", () => {
@@ -70,20 +127,24 @@ test("page styles update without duplication and disable removes only our sheet"
   vm.runInContext(readFileSync("client/public/color-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
-  vm.runInContext(source, context);
-  await Promise.resolve();
+  await vm.runInContext(source, context);
   assert.equal(document.adoptedStyleSheets.length, 2);
   assert.match(document.adoptedStyleSheets[1].css, /font-family: Arial/);
   assert.equal(document.adoptedStyleSheets[1].css.match(/animation: none/g).length, 1);
-  vm.runInContext(source, context);
-  await Promise.resolve();
+  await vm.runInContext(source, context);
   assert.equal(listeners.length, 1);
   assert.equal(document.adoptedStyleSheets.length, 2);
   listeners[0]({ settings: { newValue: { ...settings, enabled: false } } }, "local");
   assert.equal(document.adoptedStyleSheets.length, 1);
   assert.equal(document.adoptedStyleSheets[0], websiteSheet);
+  listeners[0]({ settings: { newValue: { ...settings, selected: ["cognitive:Hide distractions"] } } }, "local");
+  assert.match(document.adoptedStyleSheets[1].css, /display: none !important/);
+  assert.match(document.adoptedStyleSheets[1].css, /role="complementary"/);
+  listeners[0]({ settings: { newValue: { ...settings, selected: ["cognitive:Hide distractions"] } } }, "local");
+  assert.equal(document.adoptedStyleSheets.length, 2, "reapplying distraction hiding replaces its sheet");
   listeners[0]({ settings: { newValue: { ...settings, selected: ["motor:Keyboard focus indicators"] } } }, "local");
   assert.match(document.adoptedStyleSheets[1].css, /:focus-visible/);
+  assert.doesNotMatch(document.adoptedStyleSheets[1].css, /display: none/);
   assert.doesNotMatch(document.adoptedStyleSheets[1].css, /animation: none/);
   listeners[0]({ settings: { newValue: { version: 1, enabled: true, selected: [] } } }, "local");
   assert.equal(document.adoptedStyleSheets.length, 1);
@@ -98,7 +159,7 @@ test("page styles update without duplication and disable removes only our sheet"
 
 test("build contains the files referenced by the manifest", () => {
   const manifest = JSON.parse(readFileSync("dist/manifest.json", "utf8"));
-  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]) {
+  for (const file of [manifest.options_page, manifest.background.service_worker, "color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "content.js"]) {
     assert.ok(readFileSync(`dist/${file}`).length);
   }
   assert.equal(manifest.manifest_version, 3);
@@ -220,8 +281,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   vm.runInContext(helper, context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
-  vm.runInContext(source, context);
-  await Promise.resolve();
+  await vm.runInContext(source, context);
   function assertActive(mode, strength) {
     assert.equal(root.children.length, 2);
     assert.equal(document.adoptedStyleSheets.length, 2);
@@ -239,8 +299,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   vm.runInContext(helper, context);
   vm.runInContext(readFileSync("client/public/low-vision.js", "utf8"), context);
   vm.runInContext(readFileSync("client/public/light-sensitivity.js", "utf8"), context);
-  vm.runInContext(source, context);
-  await Promise.resolve();
+  await vm.runInContext(source, context);
   assertActive("protan", 70);
   assert.equal(listeners.length, 1);
   const apply = value => listeners[0]({ settings: { newValue: value } }, "local");
@@ -358,7 +417,7 @@ test("Save connects open websites with automatic access and requires a page ackn
   // Only content.js injections; motion, click-target, spacing and focus add-ons are injected separately.
   const pageInjections = injected.filter(item => item.files?.includes("content.js"));
   assert.deepEqual(pageInjections.map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "content.js"]);
+  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "content.js"]);
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
   automatic = false;
@@ -460,4 +519,125 @@ test("light sensitivity keeps coloured and dark surfaces, clamps strengths and r
   assert.equal(root.style.getPropertyValue('background-color'), 'rgb(255, 255, 255)');
   assert.equal(added.style.getPropertyValue('color'), '');
   assert.ok(disconnected > 0);
+});
+
+test("focus spotlight starts off, toggles with right click, pauses with Escape, and cleans up", async () => {
+  const handlers = new Map();
+  const viewHandlers = new Map();
+  const element = () => ({
+    style: { setProperty(key, value) { this[key] = value; } }, children: [], attributes: {}, handlers: new Map(),
+    addEventListener(type, handler) { this.handlers.set(type, handler); },
+    removeEventListener(type, handler) { if (this.handlers.get(type) === handler) this.handlers.delete(type); },
+    setAttribute(key, value) { this.attributes[key] = value; },
+    append(...children) { this.children.push(...children); children.forEach(child => child.parent = this); },
+    attachShadow() { this.shadow = element(); return this.shadow; },
+    showPopover() { this.shown = true; },
+    remove() { this.parent.children = this.parent.children.filter(child => child !== this); },
+  });
+  const root = element();
+  const website = element(); root.append(website);
+  const document = {
+    documentElement: root, adoptedStyleSheets: [], createElement: element,
+    addEventListener(type, handler) { assert.equal(handlers.has(type), false); handlers.set(type, handler); },
+    removeEventListener(type, handler) { if (handlers.get(type) === handler) handlers.delete(type); },
+    defaultView: { innerHeight: 800,
+      getComputedStyle: () => ({ zoom: "1.25" }),
+      addEventListener(type, handler) { viewHandlers.set(type, handler); },
+      removeEventListener(type, handler) { if (viewHandlers.get(type) === handler) viewHandlers.delete(type); },
+    },
+  };
+  const listeners = [];
+  const settings = { version: 1, enabled: true, selected: ["cognitive:Focus mode"], focusMode: { height: 100, dimming: 70 } };
+  const context = vm.createContext({ document, chrome: { storage: {
+    local: { get: async () => ({ settings }) }, onChanged: { addListener: handler => listeners.push(handler) },
+  } } });
+  // An already-connected tab can still have the page script from before focus
+  // mode shipped. Save and apply must upgrade it, retaining its dispatcher.
+  let previousCleaned = false;
+  context.clearspaceApply = value => { previousCleaned = value.enabled === false; };
+  listeners.push((changes, area) => {
+    if (area === "local" && changes.settings) context.clearspaceApply(changes.settings.newValue);
+  });
+  for (const file of ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "content.js"]) {
+    await vm.runInContext(readFileSync(`client/public/${file}`, "utf8"), context);
+  }
+  assert.equal(previousCleaned, true, "upgrade cleans up the previous page script");
+  assert.equal(listeners.length, 1, "upgrade reuses the existing storage dispatcher");
+  const { normalize } = context.clearspaceFocusMode;
+  assert.deepEqual({ ...normalize({ height: -100, dimming: 500 }) }, { height: 40, dimming: 90 });
+  assert.deepEqual({ ...normalize({ height: NaN, dimming: "70" }) }, { height: 120, dimming: 60 });
+  const host = root.children[1];
+  assert.ok(host.shown);
+  assert.equal(host.attributes["aria-hidden"], undefined);
+  assert.match(host.style.cssText, /pointer-events:none/);
+  assert.equal(host.style.zoom, "0.8", "cancel page enlargement so the reading band aligns with the viewport");
+  const shade = host.shadow.children[1];
+  assert.equal(host.shadow.children.length, 2, "no floating button");
+  assert.equal(shade.attributes["aria-hidden"], "true");
+  assert.equal(shade.style.display, "none", "starts disabled");
+  assert.equal(handlers.has("click"), false, "left clicks remain unchanged");
+  let prevented = 0;
+  const rightClick = (clientY = 400) => handlers.get("contextmenu")({ clientY, preventDefault() { prevented++; } });
+  rightClick();
+  assert.equal(shade.style.display, "block");
+  assert.match(shade.style.background, /transparent 350px, transparent 450px/);
+  rightClick();
+  assert.equal(shade.style.display, "none");
+  const pausedBackground = shade.style.background;
+  handlers.get("pointermove")({ clientY: 50 });
+  assert.equal(shade.style.background, pausedBackground);
+  rightClick();
+  assert.equal(prevented, 3, "right click suppresses the context menu");
+  assert.equal(shade.style.display, "block");
+  handlers.get("focusin")({ target: host });
+  assert.match(shade.style.background, /0\.7/);
+  assert.match(shade.style.background, /350px/);
+  handlers.get("pointermove")({ clientY: 200 });
+  assert.match(shade.style.background, /transparent 150px, transparent 250px/);
+  handlers.get("focusin")({ target: { getBoundingClientRect: () => ({ top: 300, height: 40 }) } });
+  assert.match(shade.style.background, /transparent 270px, transparent 370px/);
+  document.defaultView.innerHeight = 100;
+  viewHandlers.get("resize")();
+  assert.match(shade.style.background, /transparent 50px, transparent 150px/);
+  const apply = value => listeners[0]({ settings: { newValue: value } }, "local");
+  await vm.runInContext(readFileSync("client/public/content.js", "utf8"), context);
+  assert.equal(listeners.length, 1);
+  assert.equal(root.children.length, 2);
+  const currentHost = root.children[1];
+  const currentShade = currentHost.shadow.children[1];
+  assert.equal(currentShade.style.display, "none", "reapply starts disabled");
+  rightClick();
+  assert.equal(currentShade.style.display, "block");
+  handlers.get("keydown")({ key: "Escape" });
+  assert.equal(root.children[1], currentHost);
+  assert.equal(currentShade.style.display, "none");
+  rightClick();
+  assert.equal(currentShade.style.display, "block");
+  apply(settings);
+  assert.equal(root.children.length, 2);
+  apply({ ...settings, enabled: false });
+  assert.deepEqual(root.children, [website]);
+  assert.equal(handlers.size, 0);
+  assert.equal(viewHandlers.size, 0);
+  apply(settings);
+  apply({ ...settings, selected: [] });
+  assert.deepEqual(root.children, [website]);
+  assert.equal(handlers.size, 0);
+  apply({ ...settings, focusMode: { dimming: 0 } });
+  assert.deepEqual(root.children, [website]);
+});
+
+test("focus preferences survive saving, normalize old settings and reset to defaults", async t => {
+  const previous = globalThis.localStorage;
+  t.after(() => { if (previous === undefined) delete globalThis.localStorage; else globalThis.localStorage = previous; });
+  let stored = JSON.stringify({ version: 1, enabled: true, selected: ["motor:Reduce motion"] });
+  globalThis.localStorage = { getItem: () => stored, setItem: (_, value) => { stored = value; } };
+  const { defaults, loadSettings, saveSettings } = await import("../client/src/settings.js?focus-test");
+  assert.deepEqual((await loadSettings()).focusMode, { height: 120, dimming: 60 });
+  await saveSettings({ ...defaults, selected: ["cognitive:Focus mode", "cognitive:Hide distractions"], focusMode: { height: 200, dimming: 35 } });
+  assert.deepEqual((await loadSettings()).focusMode, { height: 200, dimming: 35 });
+  assert.deepEqual((await loadSettings()).selected, ["cognitive:Focus mode", "cognitive:Hide distractions"]);
+  await saveSettings(defaults);
+  assert.deepEqual((await loadSettings()).focusMode, defaults.focusMode);
+  assert.deepEqual((await loadSettings()).selected, []);
 });
