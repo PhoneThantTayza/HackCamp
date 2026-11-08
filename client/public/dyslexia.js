@@ -459,7 +459,10 @@
       jobs = []; queued.clear(); hosts.clear(); latestPointer = undefined;
     }
     function apply(preferences, context) {
-      reset(); guideDismissed = false; settings = suggest(preferences, context);
+      const next = suggest(preferences, context);
+      const preserveGuide = active && settings?.guide && next.enabled && next.guide;
+      const dismissed = guideDismissed, pointer = latestPointer;
+      reset(); guideDismissed = preserveGuide ? dismissed : false; settings = next;
       if (!settings.enabled) return settings;
       if (!(Object.keys(typography()).length || settings.background || settings.lineLength !== null || settings.paragraphSpacing !== null || settings.guide || settings.wordHighlight || settings.focusParagraph || settings.allTextContrast)) return settings;
       active = true; addRoot(root);
@@ -505,7 +508,10 @@
         }, { capture: true });
         listen(doc, 'focusin', event => highlightAt(event)); listen(doc, 'pointerleave', clearHighlights);
         listen(doc, 'scroll', clearHighlights, { passive: true, capture: true }); listen(view, 'blur', clearHighlights);
-        listen(doc, 'keydown', event => { if (event.key === 'Escape') clearHighlights(); });
+        listen(doc, 'keydown', event => {
+          if (event.key === 'Escape') { guideDismissed = true; clearHighlights(); }
+        });
+        if (preserveGuide && pointer) { latestPointer = pointer; highlightAt(pointer); }
       }
       return settings;
     }

@@ -16,7 +16,7 @@
   };
   // Reuse this revision on repeated Apply, but replace older page scripts so
   // newly added adjustments work on tabs that were already connected.
-  const revision = "word-lookup-restored-5";
+  const revision = "focus-toggle-state-6";
   const previousApply = globalThis.clearspaceApply;
   if (previousApply?.revision === revision) {
     return applySavedSettings();
@@ -81,12 +81,11 @@
     restoreSurfaces = undefined;
     if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter(item => item !== sheet);
     sheet = undefined;
-    dyslexia?.reset();
     speech?.update(settings);
     wordLookup?.update(settings);
     filterSvg?.remove();
     filterSvg = undefined;
-    if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) return;
+    if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) { dyslexia?.reset(); return; }
     const names = new Set(settings.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || (lowVisionOptions.has(item.slice(7)) || globalThis.clearspaceLightSensitivity.options.includes(item.slice(7))))).map(item => item.split(":")[1]));
     // Apply low-vision rules last so their stronger link/focus cues win in combinations.
     let css = [...names].filter(name => !lowVisionOptions.has(name)).map(name => rules[name] || "").join("\n");
@@ -147,10 +146,12 @@
       sheet.replaceSync(css);
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
     }
-    if (settings.selected.includes("cognitive:Focus mode")) restoreFocus = globalThis.clearspaceFocusMode.apply(document, settings.focusMode);
+    const sharedGuide = settings.dyslexia && globalThis.clearspaceDyslexia?.suggest(settings.dyslexia);
+    if (settings.selected.includes("cognitive:Focus mode") && !(sharedGuide?.enabled && sharedGuide.guide)) restoreFocus = globalThis.clearspaceFocusMode.apply(document, settings.focusMode);
     if (settings.dyslexia) dyslexia?.apply(settings.dyslexia, {
       highContrast: names.has("High contrast"), extraLineSpacing: names.has("Extra line spacing")
     });
+    else dyslexia?.reset();
     restoreSurfaces = globalThis.clearspaceLightSensitivity.applySurfaces(document.documentElement, lightOptions, settings.lightSensitivity);
     if (names.has("Higher contrast")) restoreContrast = globalThis.clearspaceLowVision.applyContrast(document.body, strengths["Higher contrast"]);
   };

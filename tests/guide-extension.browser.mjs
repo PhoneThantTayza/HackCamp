@@ -50,6 +50,25 @@ try {
   await page.locator('button').hover();
   await page.waitForTimeout(100);
   assert.equal(await visible(), true);
+  await page.keyboard.press('Escape');
+  await page.locator('input').hover();
+  await page.waitForTimeout(100);
+  assert.equal(await visible(), false, 'Escape keeps the band off when the pointer moves');
+  await page.locator('input').click({ button: 'right' });
+  assert.equal(await visible(), true, 'One right-click turns the band back on after Escape');
+  await page.locator('input').click({ button: 'right' });
+  assert.equal(await visible(), false);
+  await options.evaluate(async () => {
+    const { settings } = await chrome.storage.local.get('settings');
+    settings.dyslexia.customization = { guideSize: 80, guideColor: '#aaddff' };
+    await chrome.storage.local.set({ settings });
+  });
+  await page.waitForTimeout(500);
+  await page.locator('button').hover();
+  await page.waitForTimeout(100);
+  assert.equal(await visible(), false, 'Preference updates preserve the right-click off state');
+  await page.locator('input').click({ button: 'right' });
+  assert.equal(await visible(), true);
   for (let i = 0; i < 5; i++) {
     await page.locator('input').click({ button: 'right' });
     assert.equal(await visible(), false);
@@ -60,6 +79,17 @@ try {
     assert.equal(await visible(), true);
   }
   assert.equal(await page.locator('input').inputValue(), 'Keep my input');
+  await options.evaluate(async () => {
+    const { settings } = await chrome.storage.local.get('settings');
+    settings.selected = ['cognitive:Focus mode'];
+    await chrome.storage.local.set({ settings });
+  });
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('[data-clearspace-focus]').count(), 0, 'Legacy settings must not add a second focus overlay');
+  await page.locator('input').click({ button: 'right' });
+  assert.equal(await visible(), false);
+  await page.locator('input').click({ button: 'right' });
+  assert.equal(await visible(), true);
   console.log('PASS real loaded extension: five right-click off/on cycles in isolated world with a blocking website context-menu handler');
 } finally {
   await context?.close();
