@@ -16,11 +16,7 @@
   // An identifier, not a security token; works on ordinary HTTP pages too.
   const filterId = `clearspace-colour-${Math.random().toString(36).slice(2)}`;
   const rules = {
-    "Larger text": "html { font-size: 125% !important; } body :where(p, li, input, textarea, button, label, td, th) { font-size: max(1.1rem, 18px) !important; }",
-    "High contrast": "html, body, body :where(main, article, section, div, p, li, header, footer, nav, input, textarea, button, select) { background-color: #fff !important; color: #111 !important; } body a { color: #0033a0 !important; }",
-    "Extra line spacing": "body :where(p, li, blockquote, input, textarea) { line-height: 1.8 !important; }",
     "Reduce motion": "*, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }",
-    "Underline links": "body a { text-decoration: underline !important; text-underline-offset: .15em !important; }",
     "Readable font": "body :where(p, li, a, h1, h2, h3, h4, h5, h6, button, input, textarea, label) { font-family: Arial, sans-serif !important; }",
     "Wider letter spacing": "body :where(p, li, a, h1, h2, h3, button, label) { letter-spacing: .08em !important; word-spacing: .12em !important; }",
     "Shorter lines": "body :where(p, blockquote) { max-width: 65ch !important; }",
@@ -35,7 +31,7 @@
     filterSvg?.remove();
     filterSvg = undefined;
     if (!settings || settings.version !== 1 || !settings.enabled || !Array.isArray(settings.selected)) return;
-    const names = new Set(settings.selected.filter(item => typeof item === "string").map(item => item.split(":")[1]));
+    const names = new Set(settings.selected.filter(item => typeof item === "string" && !item.startsWith("vision:")).map(item => item.split(":")[1]));
     let css = [...names].map(name => rules[name] || "").join("\n");
     const colour = globalThis.clearspaceColorVision.normalize(settings.colorVision);
     if (colour.mode !== "off" && colour.strength > 0) {
@@ -60,7 +56,7 @@
       css += `\nhtml { filter: url(${JSON.stringify(filterUrl.href)}) !important; }`;
     }
     if (colour.cues) {
-      css += `\n${rules["Underline links"]}\n${rules["Keyboard focus indicators"]}
+      css += `\nbody a { text-decoration: underline !important; text-underline-offset: .15em !important; }\n${rules["Keyboard focus indicators"]}
         body :where(button, input, select, textarea) { border: 2px solid currentColor !important; }
         body :where([aria-invalid="true"]) { outline: 3px dashed currentColor !important; outline-offset: 3px !important; }`;
     }

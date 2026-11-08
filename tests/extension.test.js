@@ -7,7 +7,7 @@ test("page styles update without duplication and disable removes only our sheet"
   const websiteSheet = { website: true };
   const document = { adoptedStyleSheets: [websiteSheet] };
   const listeners = [];
-  let settings = { version: 1, enabled: true, selected: ["vision:Larger text", "vision:Reduce motion", "motor:Reduce motion"] };
+  let settings = { version: 1, enabled: true, selected: ["dyslexia:Readable font", "motor:Reduce motion", "cognitive:Reduce motion"] };
   const context = vm.createContext({ document, CSSStyleSheet: class { replaceSync(css) { this.css = css; } }, chrome: {
     storage: { local: { get: async () => ({ settings }) }, onChanged: { addListener: fn => listeners.push(fn) } }
   } });
@@ -16,7 +16,7 @@ test("page styles update without duplication and disable removes only our sheet"
   vm.runInContext(source, context);
   await Promise.resolve();
   assert.equal(document.adoptedStyleSheets.length, 2);
-  assert.match(document.adoptedStyleSheets[1].css, /125%/);
+  assert.match(document.adoptedStyleSheets[1].css, /font-family: Arial/);
   assert.equal(document.adoptedStyleSheets[1].css.match(/animation: none/g).length, 1);
   vm.runInContext(source, context);
   await Promise.resolve();
@@ -25,12 +25,18 @@ test("page styles update without duplication and disable removes only our sheet"
   listeners[0]({ settings: { newValue: { ...settings, enabled: false } } }, "local");
   assert.equal(document.adoptedStyleSheets.length, 1);
   assert.equal(document.adoptedStyleSheets[0], websiteSheet);
-  listeners[0]({ settings: { newValue: { ...settings, selected: ["vision:Underline links"] } } }, "local");
-  assert.match(document.adoptedStyleSheets[1].css, /underline/);
-  assert.doesNotMatch(document.adoptedStyleSheets[1].css, /125%/);
+  listeners[0]({ settings: { newValue: { ...settings, selected: ["motor:Keyboard focus indicators"] } } }, "local");
+  assert.match(document.adoptedStyleSheets[1].css, /:focus-visible/);
+  assert.doesNotMatch(document.adoptedStyleSheets[1].css, /animation: none/);
   listeners[0]({ settings: { newValue: { version: 1, enabled: true, selected: [] } } }, "local");
   assert.equal(document.adoptedStyleSheets.length, 1);
   assert.equal(document.adoptedStyleSheets[0], websiteSheet);
+  // Previously saved Vision choices must no longer affect webpages.
+  listeners[0]({ settings: { newValue: { version: 1, enabled: true, selected: [
+    "vision:Larger text", "vision:High contrast", "vision:Extra line spacing",
+    "vision:Reduce motion", "vision:Underline links",
+  ] } } }, "local");
+  assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
 });
 
 test("build contains the files referenced by the manifest", () => {
@@ -57,7 +63,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   const websiteSheet = { website: true };
   const document = { URL: "https://example.test/article#section", documentElement: root, createElementNS: (_, name) => element(name), adoptedStyleSheets: [websiteSheet] };
   const listeners = [];
-  const settings = { version: 1, enabled: true, selected: ["vision:Larger text"], colorVision: { mode: "protan", strength: 70, cues: true } };
+  const settings = { version: 1, enabled: true, selected: ["dyslexia:Readable font"], colorVision: { mode: "protan", strength: 70, cues: true } };
   const context = vm.createContext({ document, URL, CSSStyleSheet: class { replaceSync(css) { this.css = css; } }, chrome: {
     storage: { local: { get: async () => ({ settings }) }, onChanged: { addListener: fn => listeners.push(fn) } }
   } });
@@ -75,7 +81,7 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   }
   assertActive("protan", 70);
   assert.match(document.adoptedStyleSheets[1].css, /https:\/\/example\.test\/article#clearspace-colour-/);
-  assert.match(document.adoptedStyleSheets[1].css, /125%/);
+  assert.match(document.adoptedStyleSheets[1].css, /font-family: Arial/);
   assert.match(document.adoptedStyleSheets[1].css, /dashed/);
   // The same scripts are injected every time the user applies to this tab.
   vm.runInContext(helper, context);
@@ -132,7 +138,7 @@ test("content injection acknowledges application and reports asynchronous failur
     document: { adoptedStyleSheets: [] },
     CSSStyleSheet: class { replaceSync() { throw new Error("Styles could not be installed"); } },
     chrome: { storage: {
-      local: { get: async () => ({ settings: { version: 1, enabled: true, selected: ["vision:Larger text"] } }) },
+      local: { get: async () => ({ settings: { version: 1, enabled: true, selected: ["dyslexia:Readable font"] } }) },
       onChanged: { addListener() {} },
     } },
   });

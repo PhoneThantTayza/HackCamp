@@ -84,7 +84,8 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 .controls-feedback { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; line-height: 1.7; margin-top: 14px; }
 @media (max-width: 480px) { .browsing-controls { padding: 18px; } .controls-heading { gap: 12px; } .automatic-access .secondary-button { width: 100%; } }
 
-.colour-controls { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 18px; }
+.colour-controls { padding-top: 6px; }
+.colour-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0; }
 .colour-label { display: block; font-size: 12px; margin: 14px 0 8px; }
 .colour-select { width: 100%; min-height: 44px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px; font: inherit; font-size: 12px; }
 .colour-strength { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; margin: 18px 0 8px; }
