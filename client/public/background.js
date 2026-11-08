@@ -1,4 +1,5 @@
 importScripts('selection-tts.js');
+importScripts('word-lookup-background.js');
 
 // The clicked tab is kept in the settings URL, even after settings take focus.
 chrome.action.onClicked.addListener(tab => {
@@ -13,7 +14,7 @@ async function syncAutomaticAccess() {
   if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: registered.map(script => script.id) });
   if (granted) {
     await chrome.scripting.registerContentScripts([{
-      id: "clearspace-auto", matches: origins, js: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], runAt: "document_idle", world: "ISOLATED",
+      id: "clearspace-auto", matches: origins, js: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"], runAt: "document_idle", world: "ISOLATED",
       allFrames: true, matchOriginAsFallback: true
     }, {
       // Reduce motion: wraps HTMLMediaElement.prototype.play in the page's own world.
@@ -29,7 +30,7 @@ async function syncAutomaticAccess() {
     }]);
     const tabs = await chrome.tabs.query({});
     await Promise.allSettled(tabs.flatMap(tab => [
-      chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"], world: "ISOLATED" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion-main.js"], world: "MAIN" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion.js"], world: "ISOLATED" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["click-targets.js"], world: "ISOLATED" }),

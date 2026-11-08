@@ -47,7 +47,7 @@ export async function applyToTarget() {
     throw new Error("Settings saved, but no website is connected. Open the website you want to adjust, click the Clearspace toolbar icon, then Save and apply. Or select Allow site access here to apply automatically.");
   }
   const results = await Promise.allSettled([...targetIds].map(async tabId => {
-    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], world: "ISOLATED" });
+    const injected = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"], world: "ISOLATED" });
     const main = injected.find(frame => frame.frameId === 0);
     // Verify explicitly instead of relying on the completion value of a batch
     // of script files. Pin verification to the injected document if available.

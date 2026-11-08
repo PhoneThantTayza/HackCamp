@@ -62,7 +62,7 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
   const registrations = [];
   const injections = [];
   const noop = { addListener() {} };
-  const context = vm.createContext({ importScripts(file) { assert.equal(file, "selection-tts.js"); }, chrome: {
+  const context = vm.createContext({ importScripts(file) { assert.ok(["selection-tts.js", "word-lookup-background.js"].includes(file)); }, chrome: {
     action: { onClicked: noop }, runtime: { onInstalled: noop, onStartup: noop },
     permissions: { contains: async () => true, onAdded: noop, onRemoved: noop },
     tabs: { query: async () => [{ id: 7 }] },
@@ -74,7 +74,7 @@ test("automatic access loads light sensitivity alongside the motor and motion sc
   } });
   vm.runInContext(readFileSync("client/public/background.js", "utf8"), context);
   await vm.runInContext("syncAutomaticAccess()", context);
-  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"];
+  const core = ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"];
 
   assert.deepEqual(Array.from(registrations.find(script => script.id === "clearspace-auto").js), core);
   assert.deepEqual(Array.from(injections.find(script => script.files.includes("content.js")).files), core);
@@ -420,7 +420,7 @@ test("Save connects open websites with automatic access and requires a page ackn
   // Only content.js injections; motion, click-target, spacing and focus add-ons are injected separately.
   const pageInjections = injected.filter(item => item.files?.includes("content.js"));
   assert.deepEqual(pageInjections.map(item => item.target.tabId), [7, 8]);
-  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"]);
+  assert.deepEqual(pageInjections[0].files, ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "word-lookup.js", "content.js"]);
 
   assert.deepEqual(injected.find(item => item.func).target, { tabId: 7, documentIds: ["document-7"] });
   assert.equal(applied, 1);
@@ -640,7 +640,11 @@ test("focus preferences survive saving, normalize old settings and reset to defa
   assert.deepEqual((await loadSettings()).focusMode, { height: 120, dimming: 60 });
   await saveSettings({ ...defaults, selected: ["cognitive:Focus mode", "cognitive:Hide distractions"], focusMode: { height: 200, dimming: 35 } });
   assert.deepEqual((await loadSettings()).focusMode, { height: 200, dimming: 35 });
-  assert.deepEqual((await loadSettings()).selected, ["cognitive:Focus mode", "cognitive:Hide distractions"]);
+  const shared = await loadSettings();
+  assert.deepEqual(shared.selected, ["cognitive:Hide distractions"]);
+  assert.equal(shared.dyslexia.experiences.losePlace, true);
+  assert.equal(shared.dyslexia.customization.guideSize, 160);
+  assert.equal(shared.dyslexia.customization.dimming, 0.35);
   await saveSettings(defaults);
   assert.deepEqual((await loadSettings()).focusMode, defaults.focusMode);
   assert.deepEqual((await loadSettings()).selected, []);
