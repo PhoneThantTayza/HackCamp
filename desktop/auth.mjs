@@ -10,7 +10,7 @@ import fs from 'node:fs';
 
 const DOMAIN = process.env.AUTH0_DOMAIN || 'dev-tsmyxcbitdn1q1vy.us.auth0.com';
 const CLIENT_ID = process.env.AUTH0_CLIENT_ID || 'lXZhBKJAB3KVeANrjy2G1nfcl6Lp0ts4';
-const AUDIENCE = process.env.AUTH0_AUDIENCE || 'https://clearspace-api';
+const AUDIENCE = process.env.AUTH0_AUDIENCE || 'https://accessify-api';
 const PORT = 53682;
 const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
 export const API = process.env.CLEARSPACE_API_URL || 'http://localhost:3000';

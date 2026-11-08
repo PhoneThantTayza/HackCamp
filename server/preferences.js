@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { auth } from "express-oauth2-jwt-bearer";
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || "dev-tsmyxcbitdn1q1vy.us.auth0.com";
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || "https://clearspace-api";
+const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || "https://accessify-api";
 
 // A small JSON file is enough for the demo; swap for a real database later.
 const here = path.dirname(fileURLToPath(import.meta.url));
