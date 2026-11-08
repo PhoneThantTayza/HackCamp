@@ -1,0 +1,6 @@
+html { background: #fffefa; color: #253a32; font: 16px/1.65 Georgia, serif; }
+body { margin: 0; padding: 27px; }
+main { max-width: 70ch; margin: 0 auto; }
+p { margin: 0 0 1.3em; overflow-wrap: anywhere; white-space: pre-wrap; }
+p:first-child { font-size: 1.3em; }
+::selection { background: #cddfb7; color: #173c2b; }

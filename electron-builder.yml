@@ -1,0 +1,36 @@
+appId: org.clearspace.desktop
+productName: Clearspace
+asar: true
+directories:
+  output: release
+files:
+  - desktop/**
+  - dist/**
+  - client/public/*.js
+  - package.json
+  - '!desktop/native/**'
+  - '!desktop/smoke.mjs'
+extraResources:
+  - from: build/native
+    to: native
+  - from: build/companion
+    to: companion
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.utilities
+  hardenedRuntime: true
+  entitlements: desktop/entitlements.mac.plist
+  extendInfo:
+    NSAccessibilityUsageDescription: Clearspace uses accessibility access to outline focused controls and read text you explicitly select.
+    NSAppleEventsUsageDescription: Clearspace controls System Events to enable Dark mode and restore your previous appearance when you pause or quit.
+    NSScreenCaptureUsageDescription: Clearspace processes desktop frames locally to adjust colours across applications. Frames are never saved or uploaded.
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

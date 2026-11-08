@@ -3,12 +3,22 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "desktop/main.mjs",
+  "description": "Clearspace desktop accessibility companion and browser extension",
+  "author": "Clearspace contributors",
   "scripts": {
     "dev:client": "vite",
     "dev:server": "nodemon --watch server server/server.js",
     "dev": "npm run dev:server",
     "build": "vite build",
-    "start": "node server/server.js --production"
+    "start": "node server/server.js --production",
+    "desktop:prepare": "npm run build && node scripts/build-native.mjs && node scripts/prepare-companion.mjs",
+    "desktop": "npm run desktop:prepare && electron .",
+    "desktop:launch": "electron .",
+    "desktop:smoke": "electron . --smoke-test",
+    "desktop:package": "npm run desktop:prepare && electron-builder",
+    "test:desktop": "node --test tests/desktop.test.mjs tests/system-effects.test.mjs",
+    "test:extension": "node --test tests/*.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",
@@ -22,7 +32,10 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
     "nodemon": "^3.1.4",
+    "playwright-core": "^1.65.0",
     "tailwindcss": "^4.3.5",
     "vite": "^5.3.1"
   }
