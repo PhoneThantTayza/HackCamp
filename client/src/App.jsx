@@ -34,12 +34,13 @@ function ColourVisionControls({ value, onChange, enabled }) {
     <div id="colour-options" hidden={!open}>
     <p id="colour-help" className="muted control-description">Try a palette and choose the strength that makes colours easier for you to tell apart.</p>
     <label htmlFor="colour-mode" className="colour-label">Colour assistance</label>
-    <select id="colour-mode" className="colour-select" value={value.mode} aria-describedby="colour-help colour-limit" onChange={event => onChange({ ...value, mode: event.target.value })}>
+    <select id="colour-mode" className="colour-select" value={value.mode} aria-describedby={value.mode === "off" ? "colour-help" : "colour-help colour-limit"} onChange={event => onChange({ ...value, mode: event.target.value })}>
       <option value="off">Off — original colours</option>
       <option value="protan">Red–green: red emphasis (protan)</option>
       <option value="deutan">Red–green: green emphasis (deutan)</option>
       <option value="tritan">Blue–yellow (tritan)</option>
     </select>
+    {value.mode !== "off" && <>
     <div className="colour-strength"><label htmlFor="colour-strength">Strength</label><output htmlFor="colour-strength">{value.strength}%</output></div>
     <input id="colour-strength" className="colour-range" type="range" min="0" max="100" step="5" value={value.strength} disabled={value.mode === "off"} onChange={event => onChange({ ...value, strength: Number(event.target.value) })} />
     <label className="option-row"><input type="checkbox" checked={value.cues} onChange={event => onChange({ ...value, cues: event.target.checked })} /><span>Use cues beyond colour<small className="muted block">Underline links, outline controls and mark invalid fields with dashed outlines.</small></span></label>
@@ -49,6 +50,7 @@ function ColourVisionControls({ value, onChange, enabled }) {
       {[false, true].map(adjusted => <div key={String(adjusted)} className="colour-sample-row"><span className="muted">{adjusted ? "Your settings" : "Original"}</span><div className="colour-swatches" style={{ filter: adjusted && filtered ? "url(#clearspace-sample-colour)" : "none" }}>{samples.map(([colour, name, shape]) => <div key={name} className="colour-swatch"><span style={{ backgroundColor: colour }} aria-hidden="true">{shape}</span><small>{name}</small></div>)}</div></div>)}
     </div>
     <p id="colour-limit" className="muted control-caption">Colour remapping affects the whole page, including images. Results vary; this is assistance, not a simulation or a correction. The sample updates now; save to apply to your webpage.</p>
+    </>}
     </div>
   </div>;
 }
