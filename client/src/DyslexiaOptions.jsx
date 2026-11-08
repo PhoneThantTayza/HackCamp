@@ -104,7 +104,7 @@ export default function DyslexiaOptions({ value, onChange, enabled, speechReset,
         </div>)}
         <button type="button" className="clear-button text-xs" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Use suggested settings</button>
       </details>
-      <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
+      <p className="muted dyslexia-help mt-3">Changes save and apply to connected webpages automatically.</p>
     </div>}
   </section>;
 }

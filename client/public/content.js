@@ -1,6 +1,7 @@
 (() => {
-  const storage = globalThis.chrome?.storage;
-  const storageError = "Clearspace's extension storage is unavailable. Reload Clearspace in chrome://extensions, refresh this webpage, then Save and apply again.";
+  const api = globalThis.clearspacePreviewApi ?? globalThis.chrome;
+  const storage = api?.storage;
+  const storageError = "Clearspace's extension storage is unavailable. Reload Clearspace in chrome://extensions, refresh this webpage, then change an adjustment to try again.";
   if (!storage?.local?.get || !storage?.onChanged?.addListener) return { applied: false, error: storageError };
   // Return an acknowledgement only after the stored settings reach the page.
   // Otherwise executeScript can succeed while this asynchronous work fails.
@@ -36,7 +37,7 @@
   let sheet;
   let restoreFocus;
   const dyslexia = globalThis.clearspaceDyslexia?.createController(document);
-  const speech = globalThis.clearspaceSelectionReader?.createController(document, chrome);
+  const speech = globalThis.clearspaceSelectionReader?.createController(document, api);
   let restoreContrast;
   let restoreSurfaces;
   let filterSvg;
