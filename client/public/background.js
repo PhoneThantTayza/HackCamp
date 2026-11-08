@@ -21,9 +21,9 @@ async function syncAutomaticAccess() {
     }, {
       id: "clearspace-motion", matches: origins, js: ["motion.js"], runAt: "document_start", allFrames: true, world: "ISOLATED"
     }, {
-      id: "clearspace-click-targets", matches: origins, js: ["click-targets.js"], runAt: "document_start", allFrames: true, world: "ISOLATED"
+      id: "clearspace-click-targets", matches: origins, js: ["motor-levels.js", "click-targets.js"], runAt: "document_start", allFrames: true, world: "ISOLATED"
     }, {
-      id: "clearspace-button-spacing", matches: origins, js: ["button-spacing.js"], runAt: "document_start", allFrames: true, world: "ISOLATED"
+      id: "clearspace-button-spacing", matches: origins, js: ["motor-levels.js", "button-spacing.js"], runAt: "document_start", allFrames: true, world: "ISOLATED"
     }, {
       id: "clearspace-keyboard-focus", matches: origins, js: ["keyboard-focus.js"], runAt: "document_start", allFrames: true, world: "ISOLATED"
     }]);
@@ -32,8 +32,8 @@ async function syncAutomaticAccess() {
       chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["color-vision.js", "low-vision.js", "light-sensitivity.js", "focus-mode.js", "dyslexia.js", "selection-reader.js", "content.js"], world: "ISOLATED" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion-main.js"], world: "MAIN" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motion.js"], world: "ISOLATED" }),
-      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["click-targets.js"], world: "ISOLATED" }),
-      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["button-spacing.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motor-levels.js", "click-targets.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["motor-levels.js", "button-spacing.js"], world: "ISOLATED" }),
       chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["keyboard-focus.js"], world: "ISOLATED" })
     ]));
   }

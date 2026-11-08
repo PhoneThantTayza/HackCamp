@@ -1,6 +1,6 @@
 // Clearspace - Larger click targets
 // When "Larger click targets" is ON, one <style> tag makes controls at least
-// 56x56px (well above WCAG 2.5.5 44px) with a small gap between them, enlarges
+// 44-72px (set by the Motor size slider; WCAG 2.5.5 asks for 44px) with a small gap between them, enlarges
 // checkboxes/radios to 32px, pads small icon buttons, draws a soft box around
 // link targets and highlights the one under the mouse. Standalone links (menus,
 // "Read more", icon links) grow like buttons; links inside running text only get
@@ -20,13 +20,17 @@ globalThis.clearspaceClickTargetsLoaded = true;
 const STYLE_ID = "clearspace-click-targets-style";
 const LINK_ATTR = "data-clearspace-target-link"; // "block" or "inline"
 
-const CSS = `
+// Builds the CSS for a target size in px (44-72, from the Motor slider)
+const buildCss = (px) => {
+  const box = Math.round(px * 0.57); // checkbox about half the target size
+  const boxMargin = Math.round((px - box) / 2);
+  return `
   button, select, textarea,
   input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
   [role=button], [role=link], [role=checkbox], [role=tab], [role=menuitem],
   a[${LINK_ATTR}] {
-    min-width: 56px !important;
-    min-height: 56px !important;
+    min-width: ${px}px !important;
+    min-height: ${px}px !important;
     padding: max(14px, 0.8em) max(20px, 1.1em) !important;
     margin: 4px !important; /* gap between neighbouring targets */
     font-size: max(1em, 16px) !important;
@@ -45,17 +49,17 @@ const CSS = `
     box-decoration-break: clone;
   }
   input[type=checkbox], input[type=radio] {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-    min-height: 32px !important;
-    margin: 12px !important; /* 32px box + margin = 56px target */
+    width: ${box}px !important;
+    height: ${box}px !important;
+    min-width: ${box}px !important;
+    min-height: ${box}px !important;
+    margin: ${boxMargin}px !important; /* box + margin = full target size */
   }
   /* Small icon buttons: a single icon and no text */
   :is(button, [role=button], a[${LINK_ATTR}]):has(> :is(svg, img, i, span:empty):only-child) {
     padding: 16px !important;
-    min-width: 56px !important;
-    min-height: 56px !important;
+    min-width: ${px}px !important;
+    min-height: ${px}px !important;
   }
   /* Show WHERE you can click: a soft rounded box around each link target.
      Skipped while keyboard-focused so the focus indicator stays visible. */
@@ -70,6 +74,7 @@ const CSS = `
     border-radius: 10px !important;
   }
 `;
+};
 
 // ---------- standalone vs. in-text links ----------
 // A link is "in text" only if a REAL WORD sits right next to it, like
@@ -138,7 +143,7 @@ function turnOn() {
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement("style");
     style.id = STYLE_ID;
-    style.textContent = CSS;
+    style.textContent = buildCss(currentPx);
     document.documentElement.appendChild(style);
   }
   const start = () => {
@@ -168,7 +173,18 @@ function wantsLargerTargets(settings) {
   return settings.selected.some((item) => typeof item === "string" && item.split(":")[1] === "Larger click targets");
 }
 
+let currentPx = 58;
+
+// Read the slider value (settings.motor.targetSize) and update the CSS live
+function setSize(settings) {
+  currentPx = globalThis.clearspaceMotor?.targetPx(settings?.motor?.targetSize) ?? 58;
+  if (!isOn) return; // nothing on the page to update while the option is off
+  const style = document.getElementById(STYLE_ID);
+  if (style) style.textContent = buildCss(currentPx);
+}
+
 function apply(settings) {
+  setSize(settings);
   if (wantsLargerTargets(settings)) turnOn();
   else turnOff();
 }

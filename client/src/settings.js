@@ -6,18 +6,20 @@ import "../public/color-vision.js";
 import "../public/low-vision.js";
 import "../public/light-sensitivity.js";
 import "../public/dyslexia.js";
+import "../public/motor-levels.js";
 export const lightSensitivity = globalThis.clearspaceLightSensitivity;
 export const lightSensitivityOptions = lightSensitivity.options;
 export const lowVision = globalThis.clearspaceLowVision;
 export const colorVision = globalThis.clearspaceColorVision;
 export const lowVisionOptions = lowVision.options;
 export const dyslexia = globalThis.clearspaceDyslexia;
+export const motor = globalThis.clearspaceMotor; // Motor slider levels (click target size, button spacing)
 export const unsupported = new Set(["Reading guide", "Simplified layout", "Clear headings", "Shorter paragraphs"]);
-export const defaults = { version: 1, enabled: true, selected: [], light: false, colorVision: colorVision.normalize(), lowVision: lowVision.normalize(), lightSensitivity: lightSensitivity.normalize(), focusMode: focusMode.normalize(), dyslexia: emptyDyslexia() };
+export const defaults = { version: 1, enabled: true, selected: [], light: false, colorVision: colorVision.normalize(), lowVision: lowVision.normalize(), lightSensitivity: lightSensitivity.normalize(), focusMode: focusMode.normalize(), dyslexia: emptyDyslexia(), motor: motor.normalize() };
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id && globalThis.chrome?.storage);
 export async function loadSettings() {
   const saved = isExtension ? (await chrome.storage.local.get("settings")).settings : JSON.parse(localStorage.getItem("clearspace-demo") || "null");
-  return { ...defaults, ...saved, focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
+  return { ...defaults, ...saved, motor: motor.normalize(saved?.motor), focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
 }
 export async function saveSettings(settings) {
   if (isExtension) await chrome.storage.local.set({ settings });
@@ -59,8 +61,8 @@ export async function applyToTarget() {
     await Promise.allSettled([
       chrome.scripting.executeScript({ target: { tabId }, files: ["motion-main.js"], world: "MAIN" }),
       chrome.scripting.executeScript({ target: { tabId }, files: ["motion.js"], world: "ISOLATED" }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["click-targets.js"], world: "ISOLATED" }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["button-spacing.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["motor-levels.js", "click-targets.js"], world: "ISOLATED" }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["motor-levels.js", "button-spacing.js"], world: "ISOLATED" }),
       chrome.scripting.executeScript({ target: { tabId }, files: ["keyboard-focus.js"], world: "ISOLATED" })
     ]);
     if (!frames.some(frame => frame.frameId === 0 && frame.result?.applied === true)) {
