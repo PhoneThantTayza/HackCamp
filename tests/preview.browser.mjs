@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { resolve, extname, join } from 'node:path';
+import { resolve, extname, join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 const { chromium } = await import(pathToFileURL(process.env.A11YFIX_PLAYWRIGHT ?? join(tmpdir(), 'a11yfix-browser-tools/node_modules/playwright-core/index.mjs')));
@@ -10,7 +10,7 @@ const server = createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   try {
     const file = resolve('dist', path === '/' ? 'index.html' : `.${path}`);
-    if (!file.startsWith(resolve('dist') + '/')) throw new Error('Invalid path');
+    if (!file.startsWith(resolve('dist') + sep)) throw new Error('Invalid path');
     const content = await readFile(file);
     res.setHeader('Content-Type', ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' })[extname(file)] ?? 'application/octet-stream');
     res.end(content);
@@ -63,6 +63,37 @@ try {
   const settings = { version: 1, enabled: true, selected: ['vision:Higher contrast', 'vision:Dim page', 'vision:Larger text and controls', 'motor:Extra button spacing', 'motor:Keyboard focus indicators', 'motor:Reduce motion'], colorVision: { mode: 'deutan', strength: 50, cues: true }, dyslexia: { enabled: true, experiences: { distinguishWords: true, overwhelmingParagraphs: true, losePlace: true }, customization: {} } };
   await page.evaluate(settings => document.querySelector('iframe').contentWindow.postMessage({ type: 'clearspace:preview-settings', settings }, location.origin), settings);
   const frame = page.frames().find(frame => frame.url().endsWith('/preview.html'));
+  await page.context().route('https://www.google.com/**', route => route.fulfill({ contentType: 'text/html', body: '<p>Mock search results</p>' }));
+  const lookupSettings = { version: 1, enabled: true, selected: [], dyslexia: { experiences: { unfamiliarWords: true } } };
+  await page.evaluate(settings => document.querySelector('iframe').contentWindow.postMessage({ type: 'clearspace:preview-settings', settings }, location.origin), lookupSettings);
+  await frame.waitForFunction(() => Boolean(globalThis.clearspaceWordLookup));
+  const selectPreviewWord = async (start = 0, end = 5) => {
+    await preview.locator('#preview-reading').click();
+    await frame.evaluate(({ start, end }) => {
+      const range = document.createRange();
+      const text = document.querySelector('#preview-reading').firstChild;
+      range.setStart(text, start); range.setEnd(text, end);
+      const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+    }, { start, end });
+    await page.keyboard.press('Shift');
+  };
+  const popupPromise = page.context().waitForEvent('page');
+  await selectPreviewWord();
+  const lookup = await popupPromise;
+  await lookup.waitForURL('https://www.google.com/search?**');
+  assert.equal(new URL(lookup.url()).searchParams.get('q'), 'Small definition pronunciation');
+  assert.equal(await lookup.evaluate(() => window.opener), null);
+  await lookup.close(); await page.bringToFront();
+  await frame.evaluate(() => { window.open = () => null; });
+  await selectPreviewWord(6, 13);
+  await preview.locator('[data-clearspace-lookup]').waitFor({ state: 'attached' });
+  await page.evaluate(settings => document.querySelector('iframe').contentWindow.postMessage({ type: 'clearspace:preview-settings', settings: { ...settings, enabled: false } }, location.origin), lookupSettings);
+  await preview.locator('[data-clearspace-lookup]').waitFor({ state: 'detached' });
+  await selectPreviewWord();
+  await page.waitForTimeout(500);
+  assert.equal(await preview.locator('[data-clearspace-lookup]').count(), 0);
+  console.log('PASS preview lookup: keyboard selection, Google popup, opener isolation, blocked-popup fallback, and disabled cleanup (results mocked).');
+  await page.evaluate(settings => document.querySelector('iframe').contentWindow.postMessage({ type: 'clearspace:preview-settings', settings }, location.origin), settings);
   await frame.waitForFunction(() => getComputedStyle(document.documentElement).filter.includes('brightness') && document.documentElement.dataset.a11yfixReduceMotion === 'on');
   await frame.waitForFunction(() => parseFloat(getComputedStyle(document.querySelector('#preview-reading')).letterSpacing) > 0);
   await page.getByRole('button', { name: 'Reset choices', exact: true }).click();

@@ -16,7 +16,7 @@
   };
   // Reuse this revision on repeated Apply, but replace older page scripts so
   // newly added adjustments work on tabs that were already connected.
-  const revision = "word-lookup-2";
+  const revision = "word-lookup-disable-4";
   const previousApply = globalThis.clearspaceApply;
   if (previousApply?.revision === revision) {
     return applySavedSettings();
@@ -37,8 +37,8 @@
   let sheet;
   let restoreFocus;
   const dyslexia = globalThis.clearspaceDyslexia?.createController(document);
-  const speech = globalThis.clearspaceSelectionReader?.createController(document, chrome);
-  const wordLookup = globalThis.clearspaceWordLookup?.createController(document, chrome);
+  const speech = globalThis.clearspaceSelectionReader?.createController(document, api);
+  const wordLookup = globalThis.clearspaceWordLookup?.createController(document, api);
   let restoreContrast;
   let restoreSurfaces;
   let filterSvg;

@@ -67,6 +67,40 @@ try {
   await page.evaluate(() => controller.disable());
   assert.equal(await page.locator('[data-clearspace-lookup]').count(), 0);
   console.log('PASS: lookup failure displays its cause, offers a safe direct search link, and cleans up.');
+  await page.evaluate(() => {
+    window.disabledRequests = 0;
+    controller = clearspaceWordLookup.createController(document, {
+      storage: { local: { get: async () => ({ settings: { ...preferences, dyslexia: { experiences: { unfamiliarWords: false } } } }) } },
+      runtime: { sendMessage: async () => { disabledRequests++; throw new Error('Should not send'); } },
+    });
+    controller.update(preferences); document.getSelection().removeAllRanges();
+  });
+  await page.locator('#word').dblclick(); await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => disabledRequests), 0);
+  assert.equal(await page.locator('[data-clearspace-lookup]').count(), 0);
+  await page.evaluate(() => {
+    window.disconnectedRequests = 0;
+    controller = clearspaceWordLookup.createController(document, { runtime: { sendMessage: async () => {
+      disconnectedRequests++; throw new Error('Extension context invalidated.');
+    } } });
+    controller.update(preferences); document.getSelection().removeAllRanges();
+  });
+  await page.locator('#dynamic').dblclick(); await page.waitForTimeout(500);
+  await page.locator('#word').dblclick(); await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => disconnectedRequests), 1);
+  assert.equal(await page.locator('[data-clearspace-lookup]').count(), 0);
+  await page.evaluate(() => {
+    controller = clearspaceWordLookup.createController(document, { runtime: { sendMessage: () => new Promise(resolve => { window.resolveLookup = resolve; }) } });
+    controller.update(preferences); document.getSelection().removeAllRanges();
+  });
+  await page.locator('#dynamic').dblclick(); await page.waitForFunction(() => window.resolveLookup);
+  await page.evaluate(() => {
+    controller.update({ ...preferences, dyslexia: { experiences: { unfamiliarWords: false } } });
+    resolveLookup({ ok: false, message: 'Late failure' });
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('[data-clearspace-lookup]').count(), 0);
+  console.log('PASS: disabled stored preference, disconnected listener, and in-flight failure after disable stay silent.');
   console.log('PASS: real Chrome selection, keyboard, dynamic content, repeated enable, protected fields, disable cleanup.');
 } finally { await browser.close(); }
 
@@ -117,6 +151,15 @@ try {
   await source.locator('#second').dblclick();
   await popup.waitForURL(url => url.searchParams.get('q') === 'Resilience definition pronunciation');
   assert.equal(context.pages().filter(page => page.url().startsWith('https://www.google.com/')).length, 1);
+  await options.evaluate(async () => {
+    const { settings } = await chrome.storage.local.get('settings');
+    settings.dyslexia.experiences.unfamiliarWords = false;
+    await chrome.storage.local.set({ settings });
+  });
+  await source.bringToFront();
+  await source.locator('#first').dblclick(); await source.waitForTimeout(600);
+  assert.equal(new URL(popup.url()).searchParams.get('q'), 'Resilience definition pronunciation');
+  assert.equal(await source.locator('[data-clearspace-lookup]').count(), 0);
   console.log('PASS: actual MV3 message, Google popup URL, and popup reuse (external results mocked).');
 } finally {
   await context?.close();

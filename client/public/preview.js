@@ -3,6 +3,7 @@
   let settings = { version: 1, enabled: false, selected: [] };
   const storageListeners = new Set();
   const speechListeners = new Set();
+  let lookupWindow;
   const event = listeners => ({ addListener: fn => listeners.add(fn), removeListener: fn => listeners.delete(fn) });
   globalThis.clearspacePreviewApi = {
     storage: {
@@ -12,6 +13,25 @@
     runtime: {
       onMessage: event(speechListeners),
       async sendMessage(message) {
+        if (message.type === 'clearspace:word-lookup') {
+          if (!settings.enabled || settings.dyslexia?.enabled === false || settings.dyslexia?.experiences?.unfamiliarWords !== true) return { ok: false, cancelled: true };
+          const text = typeof message.text === 'string' ? message.text.replace(/\s+/gu, ' ').trim() : '';
+          if (!text || text.length > 120 || text.split(' ').length > 8 || !/\p{L}/u.test(text)) return { ok: false, message: 'Select a word or short phrase (up to 8 words and 120 characters).' };
+          const url = `https://www.google.com/search?q=${encodeURIComponent(`${text} definition pronunciation`)}`;
+          try {
+            if (!lookupWindow || lookupWindow.closed) {
+              lookupWindow = window.open('', '_blank', 'popup,width=480,height=700');
+              if (!lookupWindow) return { ok: false, message: 'Your browser blocked the preview popup. Use the link below, or allow popups for this page.' };
+              lookupWindow.opener = null;
+            }
+            lookupWindow.location.href = url;
+            lookupWindow.focus();
+            return { ok: true };
+          } catch {
+            lookupWindow = undefined;
+            return { ok: false, message: 'The preview could not open its lookup window. Use the link below to search.' };
+          }
+        }
         if (!globalThis.speechSynthesis) return { ok: false, message: "Listening is unavailable in this browser." };
         if (message.type === "clearspace:selection-stop") {
           speechSynthesis.cancel();

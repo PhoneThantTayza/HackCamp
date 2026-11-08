@@ -18,7 +18,7 @@ export default function CombinedPreview({ settings }) {
       <button type="button" aria-pressed={!showOriginal} onClick={() => setShowOriginal(false)}>After adjustments</button>
     </div>
     <p className="muted control-caption" role="status">{showOriginal ? "Showing the original page without adjustments. Your choices are kept." : settings.enabled ? "Showing the page with your current adjustments." : "Adjustments are paused. Both views show the original page."}</p>
-    <p id="preview-help" className="muted control-caption">Try links, buttons, text selection and Tab. Hover over text for reading tools; right-click to toggle a selected reading guide or focus band. Listening uses your browser’s available voices.</p>
+    <p id="preview-help" className="muted control-caption">Try links, buttons, text selection and Tab. With word lookup enabled, select a word to open Google results for its definition and pronunciation; selected text is sent to Google. Hover over text for reading tools; right-click to toggle a selected reading guide or focus band. Listening uses your browser’s available voices.</p>
     <iframe ref={frame} src="./preview.html" title={showOriginal ? "Original webpage before adjustments" : "Webpage with all your selected adjustments"} aria-describedby="preview-help" onLoad={() => setLoaded(true)} />
   </section>;
 }
