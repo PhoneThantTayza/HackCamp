@@ -158,11 +158,9 @@ function LightSensitivityControls({ selected, onToggle, enabled, strengths, onSt
   </div>;
 }
 
-function DyslexiaControls({ value, onChange, enabled, speechReset }) {
-  const [open, setOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [query, setQuery] = useState("");
-  const count = dyslexiaChoiceCount(value);
+function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
+  const [expandedSections, setExpandedSections] = useState({});
+  const [expandedChoices, setExpandedChoices] = useState(() => ({ ...value.experiences }));
   const custom = value.customization;
 
   const sections = [
@@ -198,66 +196,77 @@ function DyslexiaControls({ value, onChange, enabled, speechReset }) {
     onChange({ ...value, enabled: true, customization });
   }
 
+  const fieldsByChoice = {
+    distinguishWords: ['font', 'letterSpacing', 'wordSpacing', 'wordHighlight', 'allTextContrast'],
+    readingFatigue: ['focusParagraph', 'dimming'],
+    overwhelmingParagraphs: ['lineHeight', 'lineLength', 'paragraphSpacing', 'alignStart'],
+    losePlace: ['guide', 'guideSize', 'guideColor'],
+  };
+
   const filtered = sections.map(section => ({ ...section, choices: section.choices.filter(choice =>
     `${section.title} ${choice[1]} ${choice[2]}`.toLowerCase().includes(query.toLowerCase())) })).filter(section => section.choices.length);
 
   return <div className="dyslexia-controls">
-    <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={open} aria-controls="dyslexia-options" onClick={() => setOpen(!open)}><span>Dyslexia</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></button></h3>
-    <div id="dyslexia-options" hidden={!open}>
-      <p className="muted control-description">Which describes your experience? Select any. We suggest changes for you; customization is optional.</p>
       {Object.keys(custom).length > 0 && <div className="dyslexia-help">
         <p className="muted">Custom settings are overriding some suggestions.</p>
         <button type="button" className="clear-button" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Clear custom overrides</button>
       </div>}
-      {searching && <input autoFocus type="search" className="option-search" aria-label="Find Dyslexia experience" placeholder="Find an experience…" value={query} onChange={event => setQuery(event.target.value)} />}
-      {filtered.map(section => <fieldset className="dyslexia-section" key={section.title}>
-        <legend>{section.title}</legend>
-        {section.choices.map(([id, label, help, unavailable]) => <details key={id} className="dyslexia-choice">
+      {filtered.map(section => {
+        const sectionId = `dyslexia-section-${section.choices[0][0]}`;
+        const expanded = Boolean(expandedSections[section.title] || query);
+        return <section className="dyslexia-section" key={section.title}>
+        <h3 className="text-sm font-medium"><button type="button" className="category-button colour-toggle" aria-expanded={expanded} aria-controls={sectionId}
+          onClick={() => setExpandedSections(current => ({ ...current, [section.title]: !expanded }))}>
+          <span>{section.title}</span><span className={`chevron ${expanded ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
+        </button></h3>
+        <div id={sectionId} hidden={!expanded}>
+        {section.choices.map(([id, label, help, unavailable]) => <details key={id} className="dyslexia-choice" open={expandedChoices[id] === true}
+          onToggle={event => { const expanded = event.currentTarget.open; setExpandedChoices(current => current[id] === expanded ? current : { ...current, [id]: expanded }); }}>
           <summary className="dyslexia-choice-summary">
             <label className="option-row" htmlFor={`dyslexia-${id}`}>
               <input id={`dyslexia-${id}`} type="checkbox" disabled={unavailable} checked={!unavailable && value.experiences[id] === true}
-                onChange={event => onChange({ ...value, enabled: true,
-                  experiences: { ...value.experiences, [id]: event.target.checked } })} />
-              <span>{label}</span>
+                onChange={event => {
+                  const checked = event.target.checked;
+                  setExpandedChoices(current => ({ ...current, [id]: checked }));
+                  onChange({ ...value, enabled: true, experiences: { ...value.experiences, [id]: checked } });
+                }} />
+              <span>{label}<small className="muted block">{help}</small></span>
             </label>
+            <span className={`chevron ${expandedChoices[id] ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span>
           </summary>
           <div className="dyslexia-choice-content">
-            <p className="muted dyslexia-help">{help}</p>
+            {fieldsByChoice[id] && <div className="dyslexia-customization">
+        {id === "distinguishWords" && <label className="dyslexia-field">Font
+          <select aria-label="Font" value={custom.font === null ? 'website' : custom.font ?? ''} onChange={event => customize('font', event.target.value === '' ? undefined : event.target.value === 'website' ? null : event.target.value)}>
+            <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
+          </select>
+        </label>}
+        {numberFields.filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
+          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
+            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
+            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
+        </label>)}
+        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
+          <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
+            <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
+          </select>
+        </label>)}
+        {[['guideColor', 'Guide color', '#ffe58a']].filter(([key]) => fieldsByChoice[id].includes(key)).map(([key, label, fallback]) => <div className="dyslexia-color" key={key}>
+          <label className="option-row"><input type="checkbox" checked={Boolean(custom[key])} onChange={event => customize(key, event.target.checked ? fallback : undefined)} /><span>Choose {label.toLowerCase()}</span></label>
+          {custom[key] && <input type="color" aria-label={label} value={custom[key]} onChange={event => customize(key, event.target.value)} />}
+        </div>)}
+        <button type="button" className="clear-button text-xs" onClick={() => onChange({ ...value, enabled: true, customization: Object.fromEntries(Object.entries(custom).filter(([key]) => !fieldsByChoice[id].includes(key))) })}>Use suggested settings</button>
+      </div>}
             {id === 'preferListening' && value.experiences.preferListening === true &&
               <ReadAloud key={speechReset} enabled={enabled} embedded preferences={value.speech}
                 onChange={speech => onChange({ ...value, speech })} />}
           </div>
         </details>)}
         {section.note && <p className="muted dyslexia-help">{section.note}</p>}
-      </fieldset>)}
+        </div>
+      </section>; })}
       {!filtered.length && <p className="muted text-xs">No matching experiences.</p>}
-      <details className="dyslexia-customization">
-        <summary>Customize suggested changes</summary>
-        <p className="muted dyslexia-help">Custom values override your experience choices. Use suggested settings below to remove overrides.</p>
-        {Object.keys(custom).length > 0 && <p className="muted dyslexia-help" role="status">{Object.keys(custom).length} custom override{Object.keys(custom).length === 1 ? '' : 's'} active.</p>}
-        <label className="dyslexia-field">Font
-          <select aria-label="Font" value={custom.font === null ? 'website' : custom.font ?? ''} onChange={event => customize('font', event.target.value === '' ? undefined : event.target.value === 'website' ? null : event.target.value)}>
-            <option value="">Suggested</option><option value="website">Keep website font</option><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option>
-          </select>
-        </label>
-        {numberFields.map(([key, label, min, max, step]) => <label className="dyslexia-field" key={key}>{label}
-          <input type="number" aria-label={label} min={min} max={max} step={step} placeholder="Suggested" value={custom[key] ?? ''}
-            onChange={event => { const next = event.target.valueAsNumber; customize(key, Number.isFinite(next) ? next : undefined); }}
-            onBlur={event => { const next = event.target.valueAsNumber; if (Number.isFinite(next)) customize(key, Math.min(max, Math.max(min, next))); }} />
-        </label>)}
-        {[['wordHighlight', 'Highlight the word under your pointer'], ['focusParagraph', 'Highlight the current passage'], ['allTextContrast', 'Contrast backgrounds for all text'], ['guide', 'Pointer reading guide'], ['alignStart', 'Align to reading direction']].map(([key, label]) => <label className="dyslexia-field" key={key}>{label}
-          <select aria-label={label} value={custom[key] === undefined ? '' : String(custom[key])} onChange={event => customize(key, event.target.value === '' ? undefined : event.target.value === 'true')}>
-            <option value="">Suggested</option><option value="true">On</option><option value="false">Off</option>
-          </select>
-        </label>)}
-        {[['guideColor', 'Guide color', '#ffe58a']].map(([key, label, fallback]) => <div className="dyslexia-color" key={key}>
-          <label className="option-row"><input type="checkbox" checked={Boolean(custom[key])} onChange={event => customize(key, event.target.checked ? fallback : undefined)} /><span>Choose {label.toLowerCase()}</span></label>
-          {custom[key] && <input type="color" aria-label={label} value={custom[key]} onChange={event => customize(key, event.target.value)} />}
-        </div>)}
-        <button type="button" className="clear-button text-xs" onClick={() => onChange({ ...value, enabled: true, customization: {} })}>Use suggested settings</button>
-      </details>
       <p className="muted dyslexia-help mt-3">Select Save and apply below to update connected webpages.</p>
-    </div>
   </div>;
 }
 
@@ -279,16 +288,16 @@ function AccessibilityCard({ group, selected, onToggle, colour, onColourChange, 
     <button type="button" className="category-button" aria-expanded={open} aria-controls={`${group.id}-options`} onClick={() => setOpen(!open)}>
       <span className="flex items-center justify-between gap-2"><span className="text-base font-medium">{group.name}</span><span className={`chevron ${open ? "rotate-180" : ""}`}><Icon name="chevron" size={18} /></span></span>
       <span className="muted mt-2 block text-xs">{group.description}</span>
-      <span className="muted mt-5 block text-xs">{count ? `${count} selected` : `${group.id === "vision" ? 3 : group.id === "dyslexia" ? "Choose what reading feels like" : group.options.length} adjustments`}</span>
+      <span className="muted mt-5 block text-xs">{count ? `${count} selected` : `${group.id === "vision" ? 3 : group.id === "dyslexia" ? 5 : group.options.length} adjustments`}</span>
     </button>
     {open && <div id={`${group.id}-options`} className="options-list">
       {searching && <input autoFocus type="search" aria-label={`Find ${group.name} adjustment`} placeholder="Find an adjustment…" value={query} onChange={event => setQuery(event.target.value)} className="option-search" />}
       {options.map(option => <label key={option} className="option-row"><input type="checkbox" disabled={unsupported.has(option)} checked={selected.includes(`${group.id}:${option}`)} onChange={() => onToggle(`${group.id}:${option}`)} /><span>{option}{unsupported.has(option) && <small className="muted block">Coming later</small>}</span></label>)}
-      {!options.length && !showColour && !showLowVision && !showLight && !showDyslexia && <p className="muted text-xs py-2">No matching adjustments.</p>}
+      {!options.length && !showColour && !showLowVision && !showLight && group.id !== "dyslexia" && <p className="muted text-xs py-2">No matching adjustments.</p>}
       {showColour && <ColourVisionControls value={colour} onChange={onColourChange} enabled={enabled} />}
       {showLight && <LightSensitivityControls selected={selected} onToggle={onToggle} enabled={enabled} strengths={lightStrengths} onStrengthChange={onLightChange} />}
       {showLowVision && <LowVisionControls strengths={lowVisionStrengths} onStrengthChange={onLowVisionChange} selected={selected} onToggle={onToggle} enabled={enabled} />}
-      {showDyslexia && <DyslexiaControls value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} speechReset={speechReset} />}
+      {group.id === "dyslexia" && <DyslexiaControls value={dyslexia} onChange={onDyslexiaChange} enabled={enabled} speechReset={speechReset} query={query} />}
     </div>}
   </section>;
 }
