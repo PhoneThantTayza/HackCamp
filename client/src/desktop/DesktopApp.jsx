@@ -206,12 +206,12 @@ export default function DesktopApp() {
       </>}
       {category === 'dyslexia' && <>
         <section className="panel"><h3>Reading comfort</h3>
-          <Toggle label="Hard to distinguish letters or words" help="Readable fonts, wider spacing and a highlight under the word you point at." scope="Reading view + websites" checked={p.dyslexia.experiences.distinguishWords} onChange={v => experience('distinguishWords', v)}>
+          <Toggle label="Hard to distinguish letters or words" help="Readable fonts, wider spacing and a highlight under the word you point at." scope={state.platform === 'darwin' ? 'Word highlight across the desktop · fonts and spacing in reading view + websites' : 'Reading view + websites'} checked={p.dyslexia.experiences.distinguishWords} onChange={v => experience('distinguishWords', v)}>
             <label className="select-field">Font<select value={suggested.font || 'system'} onChange={e => customize('font', e.target.value)}><option value="sans">Arial / sans serif</option><option value="serif">Georgia / serif</option><option value="system">System font</option></select></label>
             <Range label="Letter spacing" max={0.2} step={0.01} unit="em" value={suggested.letterSpacing ?? 0.06} onChange={v => customize('letterSpacing', v)} /><Range label="Word spacing" max={0.5} step={0.01} unit="em" value={suggested.wordSpacing ?? 0.12} onChange={v => customize('wordSpacing', v)} />
             <Toggle label="Highlight the current word" checked={suggested.wordHighlight} onChange={v => customize('wordHighlight', v)} />
           </Toggle>
-          <Toggle label="Reading feels tiring over time" help="Highlight the passage under your pointer." scope="Reading view + websites" checked={p.dyslexia.experiences.readingFatigue} onChange={v => experience('readingFatigue', v)} />
+          <Toggle label="Reading feels tiring over time" help="Highlight the passage under your pointer." scope={state.platform === 'darwin' ? 'Across the desktop + reading view + websites' : 'Reading view + websites'} checked={p.dyslexia.experiences.readingFatigue} onChange={v => experience('readingFatigue', v)} />
           <Toggle label="Long paragraphs feel overwhelming" help="Shorter lines and more room between lines and paragraphs." scope="Reading view + websites" checked={p.dyslexia.experiences.overwhelmingParagraphs} onChange={v => experience('overwhelmingParagraphs', v)}>
             <Range label="Line height" min={1} max={2.5} step={0.1} unit="×" value={suggested.lineHeight ?? 1.8} onChange={v => customize('lineHeight', v)} /><Range label="Line length" min={30} max={100} step={1} unit="ch" value={suggested.lineLength ?? 60} onChange={v => customize('lineLength', v)} /><Range label="Paragraph spacing" max={2} step={0.1} unit="em" value={suggested.paragraphSpacing ?? 0.9} onChange={v => customize('paragraphSpacing', v)} />
           </Toggle>
@@ -219,6 +219,8 @@ export default function DesktopApp() {
         <section className="panel"><h3>Focus and listening</h3><FocusControls p={p} suggested={suggested} experience={experience} customize={customize} desktop={desktop} />
           <Toggle label="I prefer listening to text" help="Read highlighted text in the reading view and websites. Bring a selection from another app with the reading shortcut." scope="Selected text from accessible apps + reading view + websites" checked={p.dyslexia.experiences.preferListening} onChange={v => experience('preferListening', v)}><Range label="Reading speed" min={0.5} max={2} step={0.1} value={p.dyslexia.speech.rate} unit="×" onChange={rate => dyslexia({ speech: { rate } })} /></Toggle>
           <p className="small muted">Fonts and paragraph layouts are adjusted in the reading view and connected websites. Other apps keep control of their own typography.</p>
+          {state.platform === 'darwin' && (suggested.wordHighlight || suggested.focusParagraph) && (!state.accessibility || !state.detection) && <div className="notice"><strong>Desktop highlights need two things:</strong> Accessibility access for Clearspace, and desktop detection turned on (Connections page). Only positions on screen are used — the text itself never leaves the app you are reading.
+            <div className="permission-actions">{!state.accessibility && <button onClick={() => action(() => bridge.requestAccessibility())}>Allow Accessibility access</button>}{!state.detection && <button onClick={() => desktop({ detectApps: true })}>Turn on desktop detection</button>}</div></div>}
         </section>
       </>}
       {category === 'motor' && <>

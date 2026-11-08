@@ -1,6 +1,6 @@
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
-window.clearspaceOverlay.onFrame(({ effects: fx, pointer, focus, activeWindow, guideY }) => {
+window.clearspaceOverlay.onFrame(({ effects: fx, pointer, focus, activeWindow, guideY, word, passage }) => {
   const scale = window.devicePixelRatio;
   const w = innerWidth, h = innerHeight;
   if (canvas.width !== Math.round(w * scale) || canvas.height !== Math.round(h * scale)) {
@@ -31,6 +31,16 @@ window.clearspaceOverlay.onFrame(({ effects: fx, pointer, focus, activeWindow, g
   }
   if (fx.dim) fill(`rgba(0,0,0,${fx.dim})`);
   if (fx.warm) fill(`rgba(255,155,45,${fx.warm})`);
+  // Dyslexia: soft box around the paragraph, brighter box + underline on the word.
+  if (fx.passage && passage) {
+    fill('rgba(255,229,138,0.18)', passage.x - 6, passage.y - 4, passage.width + 12, passage.height + 8);
+    ctx.strokeStyle = 'rgba(190,150,30,0.55)'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(passage.x - 6, passage.y - 4, passage.width + 12, passage.height + 8);
+  }
+  if (fx.wordHighlight && word) {
+    fill(`${fx.guideColor}66`, word.x - 2, word.y - 1, word.width + 4, word.height + 2);
+    fill('#17694e', word.x - 2, word.y + word.height + 1, word.width + 4, 2);
+  }
   if (fx.focus && focus) {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = fx.focusWidth + 4;

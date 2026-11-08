@@ -15,7 +15,7 @@ export class NativeClient {
       if (line.length > 150000) return;
       try {
         const event = JSON.parse(line);
-        if (event.type === 'context') onContext(event);
+        if (event.type === 'context' || event.type === 'pointer-text') onContext(event);
         else if (event.type === 'effect-error') onEffectError(event);
         else if (this.pending.has(event.requestId)) {
           const { resolve, reject, timer } = this.pending.get(event.requestId);

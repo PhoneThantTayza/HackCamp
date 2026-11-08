@@ -65,6 +65,8 @@ export function overlayEffects(preferences) {
     guideColor: reading.guideColor,
     surrounding: reading.guide ? reading.dimming : s.focusMode.dimming / 100,
     isolateWindow: has('cognitive:Hide distractions'),
+    wordHighlight: reading.enabled !== false && reading.wordHighlight === true,
+    passage: reading.enabled !== false && reading.focusParagraph === true,
     focus: focusWidth > 0,
     focusWidth,
     followKeyboard: s.desktop.followKeyboard,

@@ -77,6 +77,75 @@ func context() {
     }
     emit(result)
 }
+// ---------- Dyslexia across the desktop ----------
+// Finds the word and the paragraph under the pointer in the frontmost app, using
+// macOS Accessibility. Only rectangles (positions) are sent to Clearspace, never the text.
+var readingWord = false, readingPassage = false, lastPointerText = ""
+func parameterized(_ element: AXUIElement, _ name: String, _ value: AXValue) -> CFTypeRef? {
+    var result: CFTypeRef?
+    return AXUIElementCopyParameterizedAttributeValue(element, name as CFString, value, &result) == .success ? result : nil
+}
+func textBounds(_ element: AXUIElement, _ range: CFRange) -> CGRect? {
+    var r = range
+    guard let value = AXValueCreate(.cfRange, &r), let rect = parameterized(element, "AXBoundsForRange", value),
+          CFGetTypeID(rect) == AXValueGetTypeID() else { return nil }
+    var box = CGRect.zero
+    guard AXValueGetValue(rect as! AXValue, .cgRect, &box), box.width > 0, box.height > 0 else { return nil }
+    return box
+}
+func rectDictionary(_ r: CGRect?) -> Any { guard let r = r else { return NSNull() }; return ["x": r.origin.x, "y": r.origin.y, "width": r.width, "height": r.height] }
+func pointerText() {
+    var word: CGRect?, passage: CGRect?
+    defer {
+        let event: [String: Any] = ["type": "pointer-text", "word": rectDictionary(word), "passage": rectDictionary(passage)]
+        let key = "\(word.map { "\($0)" } ?? "-")|\(passage.map { "\($0)" } ?? "-")"
+        if key != lastPointerText { lastPointerText = key; emit(event) }
+    }
+    guard watching, readingWord || readingPassage, AXIsProcessTrusted(),
+          let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getppid() else { return }
+    // AppKit counts y from the bottom of the main screen; Accessibility counts from the top.
+    let mouse = NSEvent.mouseLocation, height = NSScreen.screens.first?.frame.height ?? 0
+    var point = CGPoint(x: mouse.x, y: height - mouse.y)
+    let application = AXUIElementCreateApplication(app.processIdentifier)
+    AXUIElementSetMessagingTimeout(application, 0.1)
+    var hit: AXUIElement?
+    guard AXUIElementCopyElementAtPosition(application, Float(point.x), Float(point.y), &hit) == .success,
+          let element = hit, !protectedField(element),
+          let pointValue = AXValueCreate(.cgPoint, &point),
+          let rangeRef = parameterized(element, "AXRangeForPosition", pointValue), CFGetTypeID(rangeRef) == AXValueGetTypeID() else { return }
+    var hitRange = CFRange()
+    guard AXValueGetValue(rangeRef as! AXValue, .cfRange, &hitRange) else { return }
+    let total = (attribute(element, kAXNumberOfCharactersAttribute) as? NSNumber)?.intValue ?? 0
+    let index = hitRange.location
+    guard total > 0, index >= 0, index < total else { return }
+    let start = max(0, index - 2000), end = min(total, index + 2000)
+    var around = CFRange(location: start, length: end - start)
+    guard let aroundValue = AXValueCreate(.cfRange, &around),
+          let text = parameterized(element, "AXStringForRange", aroundValue) as? String else { return }
+    let units = Array(text.utf16), local = index - start
+    guard local >= 0, local < units.count else { return }
+    let inside = { (r: CGRect) in r.insetBy(dx: -3, dy: -3).contains(point) }
+    if readingWord {
+        let isWordUnit = { (u: UInt16) -> Bool in
+            if u == 39 || u == 0x2019 || u == 45 { return true } // ' ’ -
+            guard let scalar = UnicodeScalar(u) else { return true } // keep surrogate pairs (emoji/CJK) together
+            return CharacterSet.alphanumerics.contains(scalar)
+        }
+        if isWordUnit(units[local]) {
+            var a = local, b = local
+            while a > 0 && isWordUnit(units[a - 1]) { a -= 1 }
+            while b + 1 < units.count && isWordUnit(units[b + 1]) { b += 1 }
+            if let box = textBounds(element, CFRange(location: start + a, length: b - a + 1)), inside(box) { word = box }
+        }
+    }
+    if readingPassage {
+        let isBreak = { (u: UInt16) in u == 10 || u == 13 || u == 0x2029 || u == 0x2028 }
+        var a = local, b = local
+        while a > 0 && !isBreak(units[a - 1]) { a -= 1 }
+        while b + 1 < units.count && !isBreak(units[b + 1]) { b += 1 }
+        if b >= a, !isBreak(units[local]), let box = textBounds(element, CFRange(location: start + a, length: b - a + 1)), inside(box) { passage = box }
+    }
+}
 func command(_ request: [String: Any]) {
     let id = request["requestId"] ?? 0
     switch request["command"] as? String {
@@ -88,6 +157,7 @@ func command(_ request: [String: Any]) {
         else if request["matrix"] == nil || request["matrix"] is NSNull { emit(["requestId": id, "applied": false]) }
         else { emit(["requestId": id, "error": "Desktop colour assistance requires macOS 12.3 or newer."]) }
     case "scale": scale.set((request["factor"] as? NSNumber)?.doubleValue, id: id)
+    case "reading": readingWord = request["word"] as? Bool ?? false; readingPassage = request["passage"] as? Bool ?? false
     case "watch": watching = request["enabled"] as? Bool ?? false
     case "permission":
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -126,5 +196,6 @@ DispatchQueue.global().async {
     }
 }
 let timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in context() }
+let textTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { _ in pointerText() }
 NSApplication.shared.setActivationPolicy(.accessory)
 NSApplication.shared.run()

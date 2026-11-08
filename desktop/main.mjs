@@ -150,6 +150,7 @@ function refreshOverlays() {
   broadcast();
 }
 let lastPointer, guidePoint, focusSignature = '';
+let pointerText = null, readingCommand = '';
 function renderOverlays() {
   const fx = overlayEffects(live());
   const pointer = screen.getCursorScreenPoint();
@@ -160,13 +161,18 @@ function renderOverlays() {
   if (!lastPointer || pointer.x !== lastPointer.x || pointer.y !== lastPointer.y) guidePoint = pointer;
   else if (fx.followKeyboard && focus && signature !== focusSignature) guidePoint = { x: focus.x + focus.width / 2, y: focus.y + focus.height / 2 };
   lastPointer = pointer; focusSignature = signature;
+  // Tell the native helper whether to look for the word / paragraph under the pointer.
+  const reading = { command: 'reading', word: !!(fx.enabled && fx.wordHighlight && recent), passage: !!(fx.enabled && fx.passage && recent) };
+  if (JSON.stringify(reading) !== readingCommand) { readingCommand = JSON.stringify(reading); native?.send(reading); }
+  const text = pointerText && Date.now() - pointerText.at < 1000 ? pointerText : null;
   for (const display of screen.getAllDisplays()) {
     const entry = overlays.get(display.id); if (!entry?.ready) continue;
     const activeWindow = recent ? localRect(context.window, display.bounds) : null;
-    entry.active = Boolean(fx.enabled && (fx.dim || fx.soften || fx.warm || fx.guide || fx.halo || (fx.focus && focus) || (fx.isolateWindow && fx.windowKnown)));
+    entry.active = Boolean(fx.enabled && (fx.dim || fx.soften || fx.warm || fx.guide || fx.halo || fx.wordHighlight || fx.passage || (fx.focus && focus) || (fx.isolateWindow && fx.windowKnown)));
     if (!entry.active) { if (entry.win.isVisible()) entry.win.hide(); continue; }
     const inside = pointer.x >= display.bounds.x && pointer.x < display.bounds.x + display.bounds.width && pointer.y >= display.bounds.y && pointer.y < display.bounds.y + display.bounds.height;
     const frame = { effects: fx, activeWindow, focus: localRect(focus, display.bounds), guideY: (guidePoint || pointer).y - display.bounds.y,
+      word: fx.wordHighlight && text ? localRect(text.word, display.bounds) : null, passage: fx.passage && text ? localRect(text.passage, display.bounds) : null,
       pointer: { x: pointer.x - display.bounds.x, y: pointer.y - display.bounds.y, inside } };
     const serialized = JSON.stringify(frame);
     if (serialized !== entry.frame) { entry.win.webContents.send('overlay:frame', frame); entry.frame = serialized; }
@@ -262,6 +268,7 @@ if (singleInstance) app.whenReady().then(async () => {
   nativeTheme.on('updated', broadcast);
   if (!smoke) native = new NativeClient(executable, event => {
     if (!preferences.desktop.detectApps) return;
+    if (event.type === 'pointer-text') { pointerText = { word: event.word, passage: event.passage, at: Date.now() }; return; }
     if (event.units === 'physical' && process.platform === 'win32') {
       for (const key of ['focus', 'window']) if (validRect(event[key])) event[key] = screen.screenToDipRect(null, event[key]);
     }
