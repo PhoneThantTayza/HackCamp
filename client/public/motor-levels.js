@@ -1,7 +1,7 @@
 // Clearspace - Motor / mobility slider levels
 // Shared by the settings page (sliders + samples) and the page scripts
 // (click-targets.js, button-spacing.js), so both always agree on the numbers.
-// Settings shape: settings.motor = { targetSize: 0-100, spacing: 0-100, motion: 0-100 }
+// Settings shape: settings.motor = { targetSize: 0-100, spacing: 0-100, motion: 0-100, focus: 0-100 }
 
 (() => {
   if (globalThis.clearspaceMotor) return;
@@ -9,7 +9,7 @@
   const clamp = (value, fallback = 50) => (Number.isFinite(value) ? Math.round(Math.max(0, Math.min(100, value))) : fallback);
 
   function normalize(value) {
-    return { targetSize: clamp(value?.targetSize), spacing: clamp(value?.spacing), motion: clamp(value?.motion, 100) };
+    return { targetSize: clamp(value?.targetSize), spacing: clamp(value?.spacing), motion: clamp(value?.motion, 100), focus: clamp(value?.focus) };
   }
 
   // Click target size: Comfortable 44px  ->  Extra large 72px
@@ -24,5 +24,9 @@
   const motionStep = (level) => (clamp(level, 100) < 34 ? 1 : clamp(level, 100) < 67 ? 2 : 3);
   const motionLabel = (level) => ["Gentle", "Calm", "Still"][motionStep(level) - 1];
 
-  globalThis.clearspaceMotor = { normalize, targetPx, gapPx, sizeLabel, gapLabel, motionStep, motionLabel };
+  // Keyboard focus outline thickness: Thin 3px -> Thick 8px
+  const ringPx = (level) => Math.round(3 + (5 * clamp(level)) / 100);
+  const ringLabel = (level) => (clamp(level) < 34 ? "Thin" : clamp(level) < 67 ? "Medium" : "Thick");
+
+  globalThis.clearspaceMotor = { normalize, targetPx, gapPx, sizeLabel, gapLabel, motionStep, motionLabel, ringPx, ringLabel };
 })();

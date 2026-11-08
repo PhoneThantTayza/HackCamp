@@ -19,7 +19,7 @@ export const defaults = { version: 1, enabled: true, selected: [], light: false,
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id && globalThis.chrome?.storage);
 export async function loadSettings() {
   const saved = isExtension ? (await chrome.storage.local.get("settings")).settings : JSON.parse(localStorage.getItem("clearspace-demo") || "null");
-  return { ...defaults, ...saved, motor: motor.normalize(saved?.motor), focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1]) && item !== "motor:Keyboard focus indicators") : [] };
+  return { ...defaults, ...saved, motor: motor.normalize(saved?.motor), focusMode: focusMode.normalize(saved?.focusMode), colorVision: colorVision.normalize(saved?.colorVision), lowVision: lowVision.normalize(saved?.lowVision), lightSensitivity: lightSensitivity.normalize(saved?.lightSensitivity), dyslexia: restoreDyslexia(saved), selected: Array.isArray(saved?.selected) ? saved.selected.filter(item => typeof item === "string" && (!item.startsWith("vision:") || [...lowVisionOptions, ...lightSensitivityOptions].some(option => item === `vision:${option}`)) && !unsupported.has(item.split(":")[1])) : [] };
 }
 export async function saveSettings(settings) {
   if (isExtension) await chrome.storage.local.set({ settings });

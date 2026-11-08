@@ -6,7 +6,7 @@ import ReadAloud from "./ReadAloud.jsx";
 const groups = [
   { id: "vision", name: "Vision", icon: "eye", description: "A little more clarity.", options: [] },
   { id: "dyslexia", name: "Dyslexia", icon: "type", description: "Reading at your rhythm.", options: [] },
-  { id: "motor", name: "Motor / mobility", icon: "hand", description: "More room to navigate.", options: ["Larger click targets", "Extra button spacing", "Reduce motion"] },
+  { id: "motor", name: "Motor / mobility", icon: "hand", description: "More room to navigate.", options: ["Larger click targets", "Extra button spacing", "Keyboard focus indicators", "Reduce motion"] },
   { id: "cognitive", name: "Cognitive", icon: "spark", description: "Less noise. More focus.", options: ["Focus mode", "Hide distractions"] },
 ];
 
@@ -289,22 +289,26 @@ function DyslexiaControls({ value, onChange, enabled, speechReset, query }) {
 }
 
 const motorDescriptions = {
-  "Larger click targets": "Make buttons and links bigger, with a soft outline, so they're easier to hit.",
-  "Extra button spacing": "Add room between buttons and links so you don't hit the wrong one.",
-  "Reduce motion": "Calm down moving things on the page.",
+  "Larger click targets": "Buttons and links get bigger, with a soft outline, so they're easier to hit.",
+  "Extra button spacing": "Buttons and links get more room between them, so you don't hit the wrong one.",
+  "Keyboard focus indicators": "A strong outline shows what you've tabbed to, plus a \"Skip to main content\" button on the first Tab.",
+  "Reduce motion": "Animations, autoplaying videos and moving GIFs calm down.",
 };
 
 // Each option's slider: which setting it changes and how each level is described
 const motorSliders = {
   "Larger click targets": { key: "targetSize", name: "Size", text: level => `${motor.sizeLabel(level)} · ${motor.targetPx(level)}px`, ends: ["Comfortable", "Extra large"], kind: "size" },
   "Extra button spacing": { key: "spacing", name: "Gap", text: level => `${motor.gapLabel(level)} · ${motor.gapPx(level)}px`, ends: ["Small", "Large"], kind: "spacing" },
+  "Keyboard focus indicators": { key: "focus", name: "Outline thickness", text: level => `${motor.ringLabel(level)} · ${motor.ringPx(level)}px`, ends: ["Thin", "Thick"], kind: "focus" },
   "Reduce motion": { key: "motion", name: "Strength", text: level => motor.motionLabel(level), ends: ["Gentle", "Still"], kind: "motion" },
 };
 
-// Vision-style sub-sections inside the Motor card
+// One slide-down per Motor adjustment, styled like the Vision sections
 const motorSections = [
-  { id: "clicking", name: "Clicking and tapping", description: "Make buttons and links easier to hit. Save to apply across websites with site access.", options: ["Larger click targets", "Extra button spacing"] },
-  { id: "motion", name: "Motion", description: "Stop things moving on their own. Drag the slider for how much to calm down.", options: ["Reduce motion"] },
+  { id: "targets", name: "Larger click targets", turnOn: "Make click targets larger", description: "Choose how big buttons and links should be. Save to apply across websites with site access.", options: ["Larger click targets"] },
+  { id: "spacing", name: "Extra button spacing", turnOn: "Add space between buttons", description: "Choose how much room to leave between buttons and links.", options: ["Extra button spacing"] },
+  { id: "keyboard", name: "Keyboard", turnOn: "Show a stronger focus outline", description: "For browsing with the Tab key instead of a mouse.", options: ["Keyboard focus indicators"] },
+  { id: "motion", name: "Reduce motion", turnOn: "Reduce motion", description: "Stop things moving on their own. Choose how much to calm down.", options: ["Reduce motion"] },
 ];
 
 function MotorSample({ kind, level, enabled }) {
@@ -314,6 +318,17 @@ function MotorSample({ kind, level, enabled }) {
     return <div className="colour-preview">
       <p className="colour-label">What {motor.motionLabel(level)} stops{!enabled && " · adjustments paused"}</p>
       <ul className="motor-motion-list">{parts.map(([label, needed]) => <li key={label} className={step >= needed ? "" : "muted"}>{step >= needed ? "✓" : "–"} {label}</li>)}</ul>
+    </div>;
+  }
+  if (kind === "focus") {
+    const ring = motor.ringPx(level);
+    return <div className="colour-preview">
+      <p className="colour-label">Live sample{!enabled && " · adjustments paused"}</p>
+      {[false, true].map(adjusted => <div key={String(adjusted)} className="colour-sample-row">
+        <span className="muted">{adjusted ? "Your settings" : "Original"}</span>
+        <div className="motor-sample"><button type="button" style={adjusted && enabled ? { outline: `${ring}px solid #1a5fff`, outlineOffset: 3, boxShadow: `0 0 0 ${ring + 3}px #fff, 0 0 0 ${ring + 6}px #111` } : {}}>Sample focus</button></div>
+      </div>)}
+      <p className="muted control-caption">Outline shown as a preview of what keyboard focus looks like.</p>
     </div>;
   }
   return <div className="colour-preview">
@@ -345,7 +360,7 @@ function MotorSection({ section, options, selected, onToggle, value, onChange, e
         const level = value[slider.key];
         const id = `motor-${slider.key}`;
         return <div key={option} className="low-vision-option">
-          <label className="option-row"><input type="checkbox" checked={on} onChange={() => onToggle(`motor:${option}`)} /><span>{option}<small className="muted block">{motorDescriptions[option]}</small></span></label>
+          <label className="option-row"><input type="checkbox" checked={on} onChange={() => onToggle(`motor:${option}`)} /><span>{section.turnOn}<small className="muted block">{motorDescriptions[option]}</small></span></label>
           {on && <>
             <div className="colour-strength"><label htmlFor={id}>{slider.name}<span className="sr-only"> for {option}</span></label><output htmlFor={id}>{slider.text(level)}</output></div>
             <input id={id} className="colour-range" type="range" min="0" max="100" step="5" value={level} aria-valuetext={slider.text(level)} onChange={event => onChange({ ...value, [slider.key]: Number(event.target.value) })} />
@@ -354,7 +369,6 @@ function MotorSection({ section, options, selected, onToggle, value, onChange, e
           </>}
         </div>;
       })}
-      <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
     </div>
   </div>;
 }
@@ -365,6 +379,7 @@ function MotorControls({ options, ...props }) {
       const shown = section.options.filter(option => options.includes(option)); // respects the card's search
       return shown.length > 0 && <MotorSection key={section.id} section={section} options={shown} {...props} />;
     })}
+    <p className="muted control-caption">Samples update now; save to apply your choices to your webpage.</p>
   </div>;
 }
 
