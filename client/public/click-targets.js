@@ -1,10 +1,12 @@
 // Clearspace - Larger click targets
 // When "Larger click targets" is ON, one <style> tag makes controls at least
-// 48x48px (above WCAG 2.5.5 44px), enlarges checkboxes/radios to ~28px and pads small
-// icon buttons. Links inside running text are left alone so paragraphs don't
-// break apart; only standalone links (menus, "Read more", icon links) grow.
+// 56x56px (well above WCAG 2.5.5 44px) with a small gap between them, enlarges
+// checkboxes/radios to 32px, pads small icon buttons, draws a soft box around
+// link targets and highlights the one under the mouse. Standalone links (menus,
+// "Read more", icon links) grow like buttons; links inside running text only get
+// extra padding so paragraphs don't break apart.
 // Turning it OFF removes the tag and the link markers.
-// content.js has a smaller rule for the same option; ours is the larger one (48px vs 44px).
+// This file is the only place that styles the "Larger click targets" option.
 
 (() => {
 // Injected by both registerContentScripts and executeScript: run only once per frame.
@@ -19,9 +21,11 @@ const CSS = `
   input:not([type=hidden]):not([type=checkbox]):not([type=radio]),
   [role=button], [role=link], [role=checkbox], [role=tab], [role=menuitem],
   a[${LINK_ATTR}] {
-    min-width: 48px !important;
-    min-height: 48px !important;
-    padding: max(10px, 0.6em) max(16px, 0.9em) !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    padding: max(14px, 0.8em) max(20px, 1.1em) !important;
+    margin: 4px !important; /* gap between neighbouring targets */
+    font-size: max(1em, 16px) !important;
     box-sizing: border-box !important;
   }
   a[${LINK_ATTR}="inline"] {
@@ -29,38 +33,64 @@ const CSS = `
     display: inline-flex !important;
     align-items: center !important;
   }
+  /* Links inside running text: grow the hit area with padding, which doesn't
+     move the surrounding words around */
+  a[href]:not([${LINK_ATTR}]) {
+    padding: 0.25em 0.15em !important;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
   input[type=checkbox], input[type=radio] {
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px !important;
-    min-height: 28px !important;
-    margin: 10px !important; /* 28px box + margin = 48px target */
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    margin: 12px !important; /* 32px box + margin = 56px target */
   }
   /* Small icon buttons: a single icon and no text */
   :is(button, [role=button], a[${LINK_ATTR}]):has(> :is(svg, img, i, span:empty):only-child) {
-    padding: 12px !important;
-    min-width: 48px !important;
-    min-height: 48px !important;
+    padding: 16px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+  }
+  /* Show WHERE you can click: a soft rounded box around each link target.
+     Skipped while keyboard-focused so the focus indicator stays visible. */
+  :is(a[${LINK_ATTR}], [role=link], [role=tab], [role=menuitem]):not(:focus-visible) {
+    border-radius: 10px !important;
+    outline: 2px solid color-mix(in srgb, currentColor 35%, transparent) !important;
+    outline-offset: -2px !important;
+  }
+  /* Highlight the target under the mouse, so you know what you'll hit */
+  :is(a[href], [role=link], [role=tab], [role=menuitem]):hover {
+    background-color: color-mix(in srgb, currentColor 16%, transparent) !important;
+    border-radius: 10px !important;
   }
 `;
 
 // ---------- standalone vs. in-text links ----------
+// A link is "in text" only if a REAL WORD sits right next to it, like
+// "read the <a>docs</a> first". Separators like " | ", "·", "(" don't count,
+// so menus such as "hide | 96 comments" still get bigger.
 const INLINE_WRAPPERS = new Set(["SPAN", "STRONG", "B", "EM", "I", "U", "SMALL", "MARK", "CODE", "ABBR", "SUP", "SUB"]);
+const HAS_WORD = /[\p{L}\p{N}]/u; // any letter or number, in any language
 
-function hasTextAround(el) {
-  for (const node of el.parentNode ? el.parentNode.childNodes : []) {
-    if (node === el) continue;
-    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) return true;
-    if (node.nodeType === Node.ELEMENT_NODE && INLINE_WRAPPERS.has(node.tagName) && node.textContent.trim()) return true;
+function neighbourHasWords(node) {
+  if (!node) return false;
+  if (node.nodeType === Node.TEXT_NODE) return HAS_WORD.test(node.textContent);
+  // A wrapper that holds another link (like "(<a>site.com</a>)") is a neighbouring
+  // target, not sentence text, so it doesn't count as words.
+  if (node.nodeType === Node.ELEMENT_NODE && INLINE_WRAPPERS.has(node.tagName)) {
+    return !node.querySelector("a[href]") && HAS_WORD.test(node.textContent);
   }
   return false;
 }
 
 function isInText(link) {
-  // Walk up through inline wrappers (<strong><a>…</a></strong>) looking for words next to us.
+  // Check the things directly before and after the link (walking out of
+  // wrappers like <strong><a>…</a></strong>) for real words.
   let el = link;
   while (el && el.parentElement) {
-    if (hasTextAround(el)) return true;
+    if (neighbourHasWords(el.previousSibling) || neighbourHasWords(el.nextSibling)) return true;
     if (!INLINE_WRAPPERS.has(el.parentElement.tagName)) return false;
     el = el.parentElement;
   }

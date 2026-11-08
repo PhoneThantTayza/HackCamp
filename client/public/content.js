@@ -25,8 +25,6 @@
     "Wider letter spacing": "body :where(p, li, a, h1, h2, h3, button, label) { letter-spacing: .08em !important; word-spacing: .12em !important; }",
     "Shorter lines": "body :where(p, blockquote) { max-width: 65ch !important; }",
     "Left-aligned text": "body :where(p, li, blockquote) { text-align: left !important; }",
-    "Larger click targets": "body :where(button, input:not([type=checkbox]):not([type=radio]), select) { min-height: 44px !important; min-width: 44px !important; }",
-    "Extra button spacing": "body button { margin: 6px !important; }",
     "Keyboard focus indicators": ":focus-visible { outline: 3px solid #005fcc !important; outline-offset: 3px !important; box-shadow: 0 0 0 6px #fff !important; }"
   };
   globalThis.clearspaceApply = settings => {

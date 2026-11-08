@@ -25,11 +25,13 @@ export async function applyToTarget() {
   }
   const results = await Promise.allSettled([...targetIds].map(async tabId => {
     const frames = await chrome.scripting.executeScript({ target: { tabId }, files: ["color-vision.js", "content.js"] });
-    // Reduce motion + click targets add-ons; failures here must not affect the content.js result.
+    // Reduce motion, click targets, button spacing + keyboard focus add-ons; failures here must not affect the content.js result.
     await Promise.allSettled([
       chrome.scripting.executeScript({ target: { tabId }, files: ["motion-main.js"], world: "MAIN" }),
       chrome.scripting.executeScript({ target: { tabId }, files: ["motion.js"] }),
-      chrome.scripting.executeScript({ target: { tabId }, files: ["click-targets.js"] })
+      chrome.scripting.executeScript({ target: { tabId }, files: ["click-targets.js"] }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["button-spacing.js"] }),
+      chrome.scripting.executeScript({ target: { tabId }, files: ["keyboard-focus.js"] })
     ]);
     if (!frames.some(frame => frame.frameId === 0 && frame.result?.applied === true)) {
       throw new Error("The webpage did not confirm that adjustments were applied. Reload the extension and refresh the webpage, then try again.");
