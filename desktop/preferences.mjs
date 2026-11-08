@@ -72,9 +72,37 @@ export function overlayEffects(preferences) {
   };
 }
 
+// One full-screen colour matrix (SVG 4x5 layout) for the native renderer:
+// the colour-blindness palette first, then Higher contrast on top of it.
+// Returns null when neither is on.
+export function desktopColourMatrix(preferences) {
+  const s = normalizePreferences(preferences);
+  if (!s.enabled) return null;
+  const palette = s.colorVision.mode !== 'off' && s.colorVision.strength > 0;
+  const strength = s.selected.includes('vision:Higher contrast') ? s.lowVision['Higher contrast'] : 0;
+  if (!palette && strength <= 0) return null;
+  const m = engines.colour.matrix(s.colorVision).trim().split(/\s+/).map(Number);
+  if (strength > 0) {
+    // Stretch colours away from mid-grey: out = c * (in - 0.5) + 0.5
+    const c = 1 + 0.35 * Math.min(strength, 200) / 100;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 4; col++) m[row * 5 + col] = Number((m[row * 5 + col] * c).toFixed(4));
+      m[row * 5 + 4] = Number((m[row * 5 + 4] * c + 0.5 * (1 - c)).toFixed(4));
+    }
+  }
+  return m;
+}
+
+// Larger text across the desktop = a bigger macOS display scale. Null = normal.
+export function desktopScaleFactor(preferences) {
+  const s = normalizePreferences(preferences);
+  const strength = s.enabled && s.selected.includes('vision:Larger text and controls') ? s.lowVision['Larger text and controls'] : 0;
+  return strength > 0 ? engines.low.metrics(strength).zoom : null;
+}
+
 // Windows' colour matrix is the transpose of SVG's four row matrix.
-export function windowsColourMatrix(colour) {
-  const svg = engines.colour.matrix(colour).trim().split(/\s+/).map(Number);
+export function windowsColourMatrix(colour, svgMatrix) {
+  const svg = svgMatrix || engines.colour.matrix(colour).trim().split(/\s+/).map(Number);
   const matrix = new Array(25).fill(0);
   for (let row = 0; row < 4; row++) for (let col = 0; col < 5; col++) matrix[col * 5 + row] = svg[row * 5 + col];
   matrix[24] = 1;

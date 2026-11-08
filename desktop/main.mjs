@@ -268,7 +268,7 @@ if (singleInstance) app.whenReady().then(async () => {
     const previous = JSON.stringify(context); context = event; contextAt = Date.now();
     if (event.app && event.app.pid !== process.pid) lastExternalApp = event.app;
     if (JSON.stringify(context) !== previous) { updateSystemEffects(); snapshot(); broadcast(); }
-  }, error => { nativeError = error; context = {}; contextAt = 0; nativeColour = false; systemEffects.failed('colour', error); systemEffects.failed('appearance', error); snapshot(); broadcast(); }, event => { systemEffects.failed(event.effect, event.error); });
+  }, error => { nativeError = error; context = {}; contextAt = 0; nativeColour = false; systemEffects.failed('colour', error); systemEffects.failed('appearance', error); systemEffects.failed('scale', error); snapshot(); broadcast(); }, event => { systemEffects.failed(event.effect, event.error); });
   native?.send({ command: 'watch', enabled: preferences.desktop.detectApps });
   if (!smoke) for (const [accelerator, label, action] of [
     ['CommandOrControl+Shift+Space', 'Pause / resume', () => save({ ...preferences, enabled: !preferences.enabled })],

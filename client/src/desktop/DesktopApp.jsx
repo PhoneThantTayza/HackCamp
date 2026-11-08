@@ -22,7 +22,7 @@ function EffectStatus({ effect, name, active, action }) {
   if (!effect || effect.state === 'off') return null;
   return <div className={`notice ${effect.state === 'error' ? 'error' : ''}`} role={effect.state === 'error' ? 'alert' : 'status'}>
     {effect.state === 'pending' ? 'Applying to the desktop… Check for a system permission dialog.' : effect.state === 'active' ? active : effect.error}
-    {effect.state === 'error' && <div><button onClick={() => action(() => bridge.retryEffect(name))}>Retry {name === 'colour' ? 'palette' : 'Dark mode'}</button></div>}
+    {effect.state === 'error' && <div><button onClick={() => action(() => bridge.retryEffect(name))}>Retry {name === 'colour' ? 'colours' : name === 'scale' ? 'larger text' : 'Dark mode'}</button></div>}
   </div>;
 }
 function ColourSample({ state }) {
@@ -197,7 +197,12 @@ export default function DesktopApp() {
           <button onClick={() => action(() => bridge.openSystemSettings('display'))}>System colour filters</button>
           <Toggle label="Use cues beyond colour" help="Outline controls and emphasize links." scope="Reading view + websites" checked={p.colorVision.cues} onChange={cues => change({ colorVision: { ...p.colorVision, cues } })} />
         </section>
-        <section className="panel"><h3>Low vision</h3>{engines.low.options.map(name => <Toggle key={name} label={name} checked={selected(`vision:${name}`)} onChange={() => toggle(`vision:${name}`)} scope={name === 'More visible keyboard focus' ? 'Desktop focus outline + reading view + websites' : 'Reading view + websites'}><Range label="Strength" max={200} value={p.lowVision[name]} onChange={value => change({ lowVision: { ...p.lowVision, [name]: value } })} /></Toggle>)}<p className="small muted">Use system magnification to enlarge other applications without changing their layouts.</p><button onClick={() => action(() => bridge.openSystemSettings('zoom'))}>System magnification</button></section>
+        <section className="panel"><h3>Low vision</h3>{engines.low.options.map(name => <Toggle key={name} label={name} checked={selected(`vision:${name}`)} onChange={() => toggle(`vision:${name}`)} scope={name === 'More visible keyboard focus' ? 'Desktop focus outline + reading view + websites' : state.platform === 'darwin' && name === 'Larger text and controls' ? 'Across the desktop (display scale) + reading view + websites' : state.platform === 'darwin' && name === 'Higher contrast' ? 'Across the desktop + reading view + websites' : 'Reading view + websites'}><Range label="Strength" max={200} value={p.lowVision[name]} onChange={value => change({ lowVision: { ...p.lowVision, [name]: value } })} /></Toggle>)}
+          <EffectStatus effect={state.effects?.scale} name="scale" active="Your display is scaled up, so text and controls are bigger in every app. Turn it off to go back to your normal scale." action={action} />
+          {p.colorVision.mode === 'off' && <EffectStatus effect={state.effects?.colour} name="colour" active="Higher contrast is active across the desktop." action={action} />}
+          {state.platform === 'darwin' && selected('vision:Higher contrast') && !state.nativeColour && <><p className="small muted">Desktop contrast needs Screen Recording permission. Frames are processed locally in memory and never saved or uploaded.</p>
+            <div className="permission-actions"><button onClick={() => action(() => bridge.requestScreenCapture())}>Allow desktop colour processing</button></div></>}
+          <p className="small muted">Use system magnification to enlarge other applications without changing their layouts.</p><button onClick={() => action(() => bridge.openSystemSettings('zoom'))}>System magnification</button></section>
       </>}
       {category === 'dyslexia' && <>
         <section className="panel"><h3>Reading comfort</h3>

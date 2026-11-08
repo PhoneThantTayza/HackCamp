@@ -39,6 +39,7 @@ if CommandLine.arguments.contains(where: { $0.hasPrefix("chrome-extension://") }
 }
 
 let appearance = DesktopAppearance()
+let scale = DesktopScale()
 var colour: AnyObject?
 if #available(macOS 12.3, *) { colour = DesktopColour() }
 var watching = true
@@ -86,6 +87,7 @@ func command(_ request: [String: Any]) {
         if #available(macOS 12.3, *), let colour = colour as? DesktopColour { colour.set(request["matrix"], id: id) }
         else if request["matrix"] == nil || request["matrix"] is NSNull { emit(["requestId": id, "applied": false]) }
         else { emit(["requestId": id, "error": "Desktop colour assistance requires macOS 12.3 or newer."]) }
+    case "scale": scale.set((request["factor"] as? NSNumber)?.doubleValue, id: id)
     case "watch": watching = request["enabled"] as? Bool ?? false
     case "permission":
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -119,6 +121,7 @@ DispatchQueue.global().async {
     // The parent closes stdin on exit, including when its pipe dies after a crash.
     DispatchQueue.main.async {
         if #available(macOS 12.3, *), let colour = colour as? DesktopColour { colour.stop() }
+        scale.restore()
         appearance.shutdown { exit(0) }
     }
 }
