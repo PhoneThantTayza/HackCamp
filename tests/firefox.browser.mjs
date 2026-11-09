@@ -117,6 +117,21 @@ try {
     const result = await evaluateAsync('browser.storage.local.set({settings:arguments[0]}).then(()=>arguments[arguments.length-1](true),error=>arguments[arguments.length-1](error.message))', [value]);
     assert.equal(result, true);
   };
+  await save({ version: 1, enabled: true, selected: [] });
+  await switchTo(first);
+  await evaluate("document.body.style.margin='0';document.body.style.display='flow-root';const swatch=document.createElement('div');swatch.id='colour-test';swatch.style.cssText='position:fixed;top:0;left:0;width:20px;height:20px;background:rgb(0,255,0);z-index:2147483647';document.body.append(swatch)");
+  const originalGreen = await cornerBrightness();
+  assert.equal(originalGreen, 255, 'The screenshot samples the green swatch');
+  await save({ version: 1, enabled: true, selected: [], colorVision: { mode: 'protan', strength: 100 } });
+  await switchTo(first);
+  await waitFor("return getComputedStyle(document.body).filter.includes('url(')");
+  const adjustedGreen = await cornerBrightness();
+  assert.ok(Math.abs(adjustedGreen - 344) <= 2, `Firefox renders the colour matrix: expected 344, received ${adjustedGreen}`);
+  await save({ version: 1, enabled: false, selected: [] });
+  await switchTo(first);
+  await waitFor("return getComputedStyle(document.body).filter==='none'");
+  assert.equal(await cornerBrightness(), originalGreen, 'Pausing restores the original colours');
+  await evaluate("document.querySelector('#colour-test').remove();document.body.style.margin='';document.body.style.display=''");
   await save(settings);
   for (const handle of [first, second]) {
     await switchTo(handle);

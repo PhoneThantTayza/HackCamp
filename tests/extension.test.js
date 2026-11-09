@@ -327,6 +327,15 @@ test("colour assistance updates and removes its own SVG and styles across save, 
   apply({ version: 1, enabled: true, selected: [] });
   assert.deepEqual(root.children, [websiteSvg]);
   assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
+  // Firefox's content-script API exposes browser, but not getBrowserInfo.
+  context.browser = context.chrome;
+  apply({ ...settings, selected: ['vision:Dim page'], lightSensitivity: { 'Dim page': 100 } });
+  assertActive('protan', 70);
+  assert.match(document.adoptedStyleSheets[1].css, /body \{ filter: url\([^\n]+ brightness\(0.5\)/);
+  assert.doesNotMatch(document.adoptedStyleSheets[1].css, /html \{ filter:/);
+  apply({ ...settings, enabled: false });
+  assert.deepEqual(root.children, [websiteSvg]);
+  assert.deepEqual(Array.from(document.adoptedStyleSheets), [websiteSheet]);
 });
 
 test("colour palettes preserve neutral colours and opacity; zero strength is identity", () => {

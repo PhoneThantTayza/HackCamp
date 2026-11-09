@@ -16,7 +16,7 @@
   };
   // Reuse this revision on repeated Apply, but replace older page scripts so
   // newly added adjustments work on tabs that were already connected.
-  const revision = "focus-toggle-state-6";
+  const revision = "firefox-colour-filter-7";
   const previousApply = globalThis.clearspaceApply;
   if (previousApply?.revision === revision) {
     return applySavedSettings();
@@ -132,7 +132,12 @@
       pageFilters.push(`url(${JSON.stringify(filterUrl.href)})`);
     }
     if (lightFilters) pageFilters.push(lightFilters);
-    if (pageFilters.length) css += `\nhtml { filter: ${pageFilters.join(" ")} !important; }`;
+    if (pageFilters.length) {
+      // Keep the SVG definitions outside the filtered subtree in Firefox.
+      // Gecko does not render this filter when it also filters its definitions.
+      const target = globalThis.browser && filterSvg ? "body" : "html";
+      css += `\n${target} { filter: ${pageFilters.join(" ")} !important; }`;
+    }
     if (lightOptions.includes("Dark page theme")) css += "\nhtml { color-scheme: dark !important; }";
     if (colour.cues) {
       css += `\nbody a { text-decoration: underline !important; text-underline-offset: .15em !important; }\n${rules["Keyboard focus indicators"]}
