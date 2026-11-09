@@ -11,9 +11,20 @@ A browser accessibility extension for **Chrome and Firefox**. Configure preferen
 
 Built with React, Tailwind CSS and browser extension scripts. Local adjustments work without a server or account. Optional account sync uses Express and Auth0 and requires separate configuration.
 
+## Installation
+
+**Accessify is now available on the Chrome Web Store!**
+
+You can install the extension directly from the Chrome Web Store in just a few clicks.
+
+1. Visit the [Chrome Web Store](https://chromewebstore.google.com/detail/ddfalmdmhbfbgaglcjjjbckgfgkbodki).
+2. Click **Add to Chrome**.
+3. Confirm by clicking **Add extension**.
+4. Pin Accessify to your toolbar and start customizing your browsing experience!
+
 ## Build and install
 
-Run from the project root:
+Clone the repo and run from the project root:
 
 ```sh
 npm install
